@@ -50,7 +50,9 @@ void UnShape :: InitializeComponent ( void )
 	//		-	Starts gameplay for this component
 	//
 	////////////////////////////////////////////////////////////////////////
-	dbgprintf ( L"UnShape::InitializeComponent\r\n" );
+
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("UnShape::InitializeComponent"));
 
 	// Base behaviour
 	UnElement::InitializeComponent();
@@ -89,6 +91,9 @@ void UnShape :: UninitializeComponent ( void )
 	//		-	Ends gameplay for this component
 	//
 	////////////////////////////////////////////////////////////////////////
+
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("UnShape::UninitializeComponent"));
 
 	// Shape
 	if (pcShp != NULL)

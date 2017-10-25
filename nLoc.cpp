@@ -266,6 +266,7 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Group/");
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Shape/");
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Image/");
+			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Light/");
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Input/Source/");
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Camera/");
 

@@ -5,6 +5,7 @@
 #include "nShape.h"
 #include "nGroup.h"
 #include "nImage.h"
+#include "nLight.h"
 //#include "nSpcInSrc.h"
 #include "nCamera.h"
 #include "nPlayerController.h"
@@ -152,6 +153,7 @@ bool nElement :: mainTick ( float fD )
 				hr = pRenLoc->getParent ( strLoc, &pParent );
 
 			// Create an actor component that handles Unreal side of the visual.
+//			UE_LOG(LogTemp, Warning, TEXT("UnElement::Init"));
 			if	(!WCASECMP(strDef,L"State/Visual/Group/")) 
 				{
 				// Currently a group is just a place holder for transformation
@@ -183,6 +185,13 @@ bool nElement :: mainTick ( float fD )
 			else if	(	!WCASECMP(strDef,L"State/Visual/Camera/") )
 				{
 				CCLTRYE ( (pRoot = NewObject<UnCamera>(pRenLoc,UnCamera::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+
+			// Light
+			else if	(	!WCASECMP(strDef,L"State/Visual/Light/") )
+				{
+				CCLTRYE ( (pRoot = NewObject<UnLight>(pRenLoc,UnLight::StaticClass()))
 								!= NULL, E_UNEXPECTED );
 				}	// else if
 
@@ -266,7 +275,10 @@ bool nElement :: mainTick ( float fD )
 					pRoot->SetRelativeTransform ( FTransform (
 						// Rotate axis so the nSpace default of XY plane facing user matches what
 						// Unreal (and its input) seems to prefer : +X away, +Y right, +Z up
-						FRotator (0,90,-90),
+//						FRotator (0,90,-90),
+
+						// No rotation
+						FRotator (0,0,0),
 
 						// Translation
 						fTrans,
