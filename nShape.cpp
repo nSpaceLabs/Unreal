@@ -53,6 +53,10 @@ void UnShape :: InitializeComponent ( void )
 
 	// Debug
 	UE_LOG(LogTemp, Warning, TEXT("UnShape::InitializeComponent"));
+	if (pParent != NULL)
+		{
+		UE_LOG(LogTemp, Warning, TEXT("pRoot %p\r\n"), pParent->pRoot );
+		}	// if
 
 	// Base behaviour
 	UnElement::InitializeComponent();
@@ -65,6 +69,9 @@ void UnShape :: InitializeComponent ( void )
 
 	// Testing
 	pcShp->SetMobility(EComponentMobility::Movable);
+//	pcShp->SetSimulatePhysics(true);
+//	pcShp->SetEnableGravity(false);
+//	pcShp->SetSimulatePhysics(true);
 
 	// Assign material
 	if (FMat->Succeeded() && (pMat = Cast<UMaterialInterface> ( FMat->Object )) != NULL)
@@ -156,6 +163,11 @@ bool UnShape :: mainTick ( float fD )
 		UStaticMesh	*pMesh	= NULL;
 		dbgprintf ( L"UnShape::mainTick:Shape:%s\r\n", (LPCWSTR)strName );
 
+		if (pParent != NULL)
+			{
+			UE_LOG(LogTemp, Warning, TEXT("pRoot %p\r\n"), pParent->pRoot );
+			}	// if
+
 		// Previous shape
 //		if (pcShp != NULL)
 //			{
@@ -219,6 +231,10 @@ bool UnShape :: mainTick ( float fD )
 			// Initial scaling
 			pcShp->SetRelativeScale3D(fSclLcl);
 			}	// if
+
+		// Testing
+//		pcShp->SetEnableGravity(false);
+//		pcShp->SetSimulatePhysics(true);
 
 		// Done
 		strName.at(0)	= '\0';

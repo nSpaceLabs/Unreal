@@ -91,6 +91,8 @@ class UnElement :
 	virtual void	inputAdd		( UPrimitiveComponent * );
 	virtual bool	mainTick		( float );
 	virtual bool	onReceive	( nElement *, const WCHAR *, const WCHAR *, const ADTVALUE & );
+	virtual USceneComponent *getSceneComponent ( void )
+		{ return NULL; }
 
 	// Custom events
 	virtual void	onButton		( IDictionary *, const WCHAR *, const WCHAR * );

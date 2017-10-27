@@ -42,6 +42,7 @@ class AnActor : public AActor
 	adtString			strRefActor;					// References
 	adtString			strRenLoc;						// Render state location
 	sysCS					csRen;							// Global render mutex
+	adtString			strLevel;						// Level requests
 
 	// Worker thread
 	AnActort				*pTick;							// Worker thread

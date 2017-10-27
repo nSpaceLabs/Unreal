@@ -10,7 +10,7 @@ UnLight::UnLight()
 	////////////////////////////////////////////////////////////////////////
 
 	// Setup
-//	pcShp		= NULL;
+	pcLight	= NULL;
 	fIntense	= 5000.0f;
 	bIntense	= false;
 	}	// UnLight

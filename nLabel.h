@@ -21,7 +21,9 @@ class UnLabel :
 	virtual void InitializeComponent		( void ) override;
 	virtual void UninitializeComponent	( void ) override;
 	virtual void onRay						( IDictionary *, const FVector &, const FVector & ) override;
- 
+ 	virtual USceneComponent *getSceneComponent ( void )
+		{ return pcLbl; }
+
 	// Text rendering
 	UTextRenderComponent	*pcLbl;
 	UTextRenderComponent	*pcCrt;

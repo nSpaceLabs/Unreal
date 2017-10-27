@@ -29,6 +29,8 @@ class UnImage : public UnElement
 
 	// Base class memebers
 	virtual void InitializeComponent ( void ) override;
+	virtual USceneComponent *getSceneComponent ( void )
+		{ return pcShp; }
 
 	// Utilities
 	virtual bool	mainTick		( float );

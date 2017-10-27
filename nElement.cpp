@@ -6,6 +6,7 @@
 #include "nGroup.h"
 #include "nImage.h"
 #include "nLight.h"
+#include "nProjectile.h"
 //#include "nSpcInSrc.h"
 #include "nCamera.h"
 #include "nPlayerController.h"
@@ -195,6 +196,13 @@ bool nElement :: mainTick ( float fD )
 								!= NULL, E_UNEXPECTED );
 				}	// else if
 
+			// Projectile
+			else if	(	!WCASECMP(strDef,L"State/Visual/Rule/Projectile/") )
+				{
+				CCLTRYE ( (pRoot = NewObject<UnProjectile>(pRenLoc,UnProjectile::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+
 			// Input source
 //			else if	(	!WCASECMP(strDef,L"State/Visual/Input/Source/") )
 //				{
@@ -209,6 +217,10 @@ bool nElement :: mainTick ( float fD )
 				CCLTRYE ( (pRoot = NewObject<UnImage>(pRenLoc,UnImage::StaticClass()))
 								!= NULL, E_UNEXPECTED );
 				}	// else if
+
+			//
+			// Rules
+			//
 
 			// If a root was created, prepare it
 			if (hr == S_OK && pRoot != NULL)

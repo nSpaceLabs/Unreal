@@ -3,32 +3,33 @@
 #pragma once
 
 #include "nElement.h"
-#include "nLight.generated.h"
+#include "nProjectile.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class UnLight : public UnElement
+class UnProjectile : public UnElement
 	{
 	GENERATED_BODY()
 	
 	public:	
 
 	// Sets default values for this actor's properties
-	UnLight();
+	UnProjectile();
 
 	// Run-time data
-	adtString				strType;						// Type
-	adtFloat					fIntense;					// Intensity
-	bool						bIntense;					// Intensity update
-	ULightComponent		*pcLight;					// Game engine component
+	adtFloat		fX,fY,fZ;								// Velocity
+	bool			bVel;										// Update velocity
+	adtString	strLocAt;								// Location of target component 
+	bool			bLoc;										// Update assigned location ?
+	UProjectileMovementComponent
+					*pcProj;									// Game engine component
 
 	// Base class memebers
 	virtual void InitializeComponent		( void ) override;
 	virtual void UninitializeComponent	( void ) override;
-	virtual USceneComponent *getSceneComponent ( void )
-		{ return pcLight; }
+//	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction);
 
 	// Utilities
 	virtual bool	mainTick		( float );

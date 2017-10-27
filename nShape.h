@@ -28,6 +28,8 @@ class UnShape : public UnElement
 	// Base class memebers
 	virtual void InitializeComponent		( void ) override;
 	virtual void UninitializeComponent	( void ) override;
+	virtual USceneComponent *getSceneComponent ( void )
+		{ return pcShp; }
 
 	// Utilities
 	virtual bool	mainTick		( float );

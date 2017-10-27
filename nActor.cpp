@@ -31,6 +31,7 @@ AnActor::AnActor()
 	strRefActor = L"Actor";
 //	strRenLoc	= L"/State/Interface/Dict/RenderList/Dict/";
 	strRenLoc	= L"/State/Render/3D/State/Default/";
+	strLevel		= L"";
 
 	// Worker thread
 	pThrd			= NULL;
@@ -351,6 +352,13 @@ HRESULT AnActor :: onValue (	const WCHAR *pwRoot,
 		_RELEASE(pDct);
 		}	// if
 
+	// Level selection
+	else if (!WCASECMP(pwLoc,L"Level/Element/Default/OnFire/Value"))
+		{
+		// Cache level selection for work in the game loop
+		adtValue::toString(vV,strLevel);
+		}	// else if
+
 	return hr;
 	}	// onValue
 
@@ -395,6 +403,33 @@ void AnActor::Tick( float DeltaTime )
 			pMnIt->next();
 			}	// for
 
+		}	// if
+
+	// Level change ?
+	if (strLevel[0] != '\0')
+		{
+		char	*pcLevel	= NULL;
+
+		// Convert to ASCII for API
+		if (strLevel.toAscii(&pcLevel) == S_OK)
+			{
+			UE_LOG(LogTemp, Warning, TEXT("Tick::Level change:"));
+			UE_LOG(LogTemp, Warning, TEXT("\r\n"));
+
+			// Is the level name changing ?
+			if (UGameplayStatics::GetCurrentLevelName(GetWorld()).
+					Compare(pcLevel) != 0)
+				{
+				// Request level change
+				UGameplayStatics::OpenLevel(GetWorld(),pcLevel);
+				}	// if
+
+			// Clean up
+			_FREETASKMEM(pcLevel);
+			}	// if
+
+		// Request complete
+		strLevel = L"";
 		}	// if
 
 	}	// Tick

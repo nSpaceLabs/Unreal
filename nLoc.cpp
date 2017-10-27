@@ -270,6 +270,9 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Input/Source/");
 			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Camera/");
 
+			// Rules
+			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Rule/Projectile/");
+
 			// Debug
 	//		dbgprintf ( L"AnLoc::onValue:%s:%s:%d:%s:%d\r\n",
 	//				pwRoot, pwLoc, vV.vtype, 
@@ -286,8 +289,8 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 				_ADDREF(pElem);
 
 				// Store in render tree at location
-	//			dbgprintf ( L"nSpcStoreValue:At %p Loc %s Value %p\r\n", 
-	//							pDctRen, (LPCWSTR)strLoc, pElem );
+//				dbgprintf ( L"nSpcStoreValue:At %p Loc %s Value %p\r\n", 
+//								pDctRen, (LPCWSTR)strLoc, pElem );
 				CCLTRY ( nspcStoreValue ( pDctRen, pwLoc, adtIUnknown(pElem) ) );
 
 				// Initialize element

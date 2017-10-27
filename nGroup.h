@@ -22,5 +22,7 @@ class UnGroup : public UnElement
 
 	// Base class memebers
 	virtual void InitializeComponent ( void ) override;
+	virtual USceneComponent *getSceneComponent ( void )
+		{ return pcBox; }
 
 };
