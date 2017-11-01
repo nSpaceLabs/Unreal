@@ -362,10 +362,10 @@ HRESULT AnActor :: onValue (	const WCHAR *pwRoot,
 		}	// else if
 
 	// Camera
-	else if (	(bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) ||
-					(bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) ||
-					(bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) ||
-					(bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) )
+	else if (	((bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) == true) ||
+					((bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) == true) ||
+					((bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) == true) ||
+					((bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) == true) )
 		{
 		// Cache new value
 //		fCamera[idx] = adtFloat(vV);		
@@ -453,13 +453,44 @@ void AnActor::Tick( float DeltaTime )
 //	else if (bCamera[0] || bCamera[1] || bCamera[2] || bCamera[3])
 	else if (bCamera[3])
 		{
+		static bool			bFirst = true;
+		static FRotator	rCtlr0;
+		static FRotator	rCamera0;
+
 		// Controller for the game
 		APlayerController
 		*pCtlr = UGameplayStatics::GetPlayerController(GetWorld(),0);
 
 		// Update orientation
 		if (pCtlr != NULL)
-			pCtlr->SetControlRotation(FRotator(FQuat(fCamera[0],fCamera[1],fCamera[2],fCamera[3])));
+			{
+			FRotator 
+			rCamera = FRotator(FQuat(fCamera[0],fCamera[1],fCamera[2],fCamera[3]));
+
+			// Use start orientation as a baseline
+			if (bFirst)
+				{
+				// Store initial position of player
+				rCtlr0	= pCtlr->GetControlRotation();
+
+				// Store initial offset for camera
+				rCamera0	= rCamera;
+
+				// Initial capture done
+				bFirst	= false;
+				}	// if
+
+			// Offset of baseline
+			rCamera -= rCamera0;
+
+			// Compute new offset player controller
+			FRotator
+			rCtlr		= rCtlr0;
+			rCtlr		+= rCamera;
+
+			// New orientation
+			pCtlr->SetControlRotation(rCtlr);
+			}	// if
 		}	// else if
 
 	}	// Tick
