@@ -43,6 +43,8 @@ class AnActor : public AActor
 	adtString			strRenLoc;						// Render state location
 	sysCS					csRen;							// Global render mutex
 	adtString			strLevel;						// Level requests
+	bool					bCamera[4];						// Camera coordinate change
+	float					fCamera[4];						// Camera coordinates
 
 	// Worker thread
 	AnActort				*pTick;							// Worker thread

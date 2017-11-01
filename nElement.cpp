@@ -8,7 +8,7 @@
 #include "nLight.h"
 #include "nProjectile.h"
 //#include "nSpcInSrc.h"
-#include "nCamera.h"
+//#include "nCamera.h"
 #include "nPlayerController.h"
 
 // Radians <-> degrees
@@ -183,14 +183,14 @@ bool nElement :: mainTick ( float fD )
 				}	// else if
 
 			// Camera
-			else if	(	!WCASECMP(strDef,L"State/Visual/Camera/") )
-				{
-				CCLTRYE ( (pRoot = NewObject<UnCamera>(pRenLoc,UnCamera::StaticClass()))
-								!= NULL, E_UNEXPECTED );
-				}	// else if
+//			else if	(	!WCASECMP(strDef,L"State/Visual/Camera/") )
+//				{
+//				CCLTRYE ( (pRoot = NewObject<UnCamera>(pRenLoc,UnCamera::StaticClass()))
+//								!= NULL, E_UNEXPECTED );
+//				}	// else if
 
 			// Light
-			else if	(	!WCASECMP(strDef,L"State/Visual/Light/") )
+			else if	(	!WCASECMP(strDef,L"State/Visual/PointLight/") )
 				{
 				CCLTRYE ( (pRoot = NewObject<UnLight>(pRenLoc,UnLight::StaticClass()))
 								!= NULL, E_UNEXPECTED );

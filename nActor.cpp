@@ -243,9 +243,11 @@ HRESULT AnActor :: onValue (	const WCHAR *pwRoot,
 	////////////////////////////////////////////////////////////////////////
 	HRESULT		hr			= S_OK;
 	adtInt		iIdx;
+//	int			idx;
 
 	// Debug
 	CCLOK ( dbgprintf ( L"AnActor::onValue:%s:%s\r\n", pwRoot, pwLoc ); )
+//	UE_LOG(LogTemp, Warning, TEXT("AnActor::onValue:%s:%s"), pwRoot, pwLoc );
 
 	// Check for render location indices, ignore reserved names
 	if (	!WCASENCMP(pwLoc,L"Locations/Dict/",15) &&
@@ -359,6 +361,20 @@ HRESULT AnActor :: onValue (	const WCHAR *pwRoot,
 		adtValue::toString(vV,strLevel);
 		}	// else if
 
+	// Camera
+	else if (	(bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) ||
+					(bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) ||
+					(bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) ||
+					(bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) )
+		{
+		// Cache new value
+//		fCamera[idx] = adtFloat(vV);		
+		if			(bCamera[0])	fCamera[0] = adtFloat(vV);
+		else if	(bCamera[1])	fCamera[1] = adtFloat(vV);
+		else if	(bCamera[2])	fCamera[2] = adtFloat(vV);
+		else if	(bCamera[3])	fCamera[3] = adtFloat(vV);
+		}	// else if
+
 	return hr;
 	}	// onValue
 
@@ -431,6 +447,20 @@ void AnActor::Tick( float DeltaTime )
 		// Request complete
 		strLevel = L"";
 		}	// if
+
+	// Camera update ?  NOTE: Currently using the knowledge that all
+	// four coordinates are updated at the same time, change this ?
+//	else if (bCamera[0] || bCamera[1] || bCamera[2] || bCamera[3])
+	else if (bCamera[3])
+		{
+		// Controller for the game
+		APlayerController
+		*pCtlr = UGameplayStatics::GetPlayerController(GetWorld(),0);
+
+		// Update orientation
+		if (pCtlr != NULL)
+			pCtlr->SetControlRotation(FRotator(FQuat(fCamera[0],fCamera[1],fCamera[2],fCamera[3])));
+		}	// else if
 
 	}	// Tick
 
