@@ -287,10 +287,10 @@ bool nElement :: mainTick ( float fD )
 					pRoot->SetRelativeTransform ( FTransform (
 						// Rotate axis so the nSpace default of XY plane facing user matches what
 						// Unreal (and its input) seems to prefer : +X away, +Y right, +Z up
-//						FRotator (0,90,-90),
+						FRotator (0,90,-90),
 
 						// No rotation
-						FRotator (0,0,0),
+//						FRotator (0,0,0),
 
 						// Translation
 						fTrans,

@@ -39,6 +39,9 @@ void UnLabel :: InitializeComponent ( void )
 	FVector		fV;
 //	FTransform	fX;
 
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("UnLabel::InitializeComponent"));
+
 	// Base behaviour
 	UnElement::InitializeComponent();
 
@@ -116,6 +119,9 @@ void UnLabel :: UninitializeComponent ( void )
 	//		-	Ends gameplay for this component
 	//
 	////////////////////////////////////////////////////////////////////////
+
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("UnLabel::UninitializeComponent"));
 
 	// Unregistering component causes a breakpoint in engine.
 	// Already taken care of ?
@@ -436,7 +442,8 @@ bool UnLabel :: onReceive (	nElement *pElem,
 
 	// Text for label
 //	if (	!WCASECMP(pwLoc,L"Element/Label/OnFire/Value") ||
-	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/Value/OnFire/Value") )
+//	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/Value/OnFire/Value") )
+	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/OnFire/Value") )
 		{
 		adtString strV(v);
 
