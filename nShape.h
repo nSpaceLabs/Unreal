@@ -9,30 +9,26 @@
  * 
  */
 UCLASS()
-class UnShape : public UnElement
+class AnShape : public AnElement
 	{
 	GENERATED_BODY()
 	
 	public:	
 
 	// Sets default values for this actor's properties
-	UnShape();
+	AnShape();
 
 	// Run-time data
 	adtString						strName;				// Shape name
-	UStaticMeshComponent			*pcShp;
+	UStaticMeshComponent			*pcShp;				// Shape mesh
 //	UStaticMesh						*pMesh;
-	UMaterialInterface			*pMat;
-	UMaterialInstanceDynamic	*pMatDyn;
+	UMaterialInterface			*pMat;				// Material
+	UMaterialInstanceDynamic	*pMatDyn;			// Dynamic material
 
-	// Base class memebers
-	virtual void InitializeComponent		( void ) override;
-	virtual void UninitializeComponent	( void ) override;
-	virtual USceneComponent *getSceneComponent ( void )
-		{ return pcShp; }
-
-	// Utilities
-	virtual bool	mainTick		( float );
-	virtual bool	onReceive	( nElement *, const WCHAR *, const WCHAR *, const ADTVALUE &);
+	// 'AnElement' class memebers
+	virtual void	BeginPlay() override;
+	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
+	virtual bool	tickMain	( float ) override;
+	virtual bool	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & ) override;
 
 	};

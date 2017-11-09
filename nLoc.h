@@ -8,16 +8,20 @@
 #include "nSpace.h"
 
 // nSpace actor
-#include "nActor.h"
-
 #include "nLoc.generated.h"
 
 // Forward decs.
 class nLocCB;
-class nElement;
+//class nElement;
+
+//
+// Class - AnLoc.  This class handles a specific render location in the namespace.
+//
 
 UCLASS()
-class AnLoc : public AActor
+class AnLoc : 
+	public AActor,
+	public InTick
 	{
 	GENERATED_BODY()
 	
@@ -26,23 +30,33 @@ class AnLoc : public AActor
 	virtual ~AnLoc();										// Destructor
 
 	// Run-time data
-	AnActor		*pRen;									// Renderer
+	AnSpace		*pSpc;									// nSpace actor
+	int			iIdx;										// Render index
 	adtString	strLocRen;								// Render location
 	IDictionary	*pDctRen;								// Render dictionary
 	adtString	strRefActor;							// References
 	nLocCB		*pCB;										// Callback
 
+	// Pending actors
+	IList			*pActQ;									// Actor queue
+	IIt			*pActIt;									// Actor queue iterator
+
 	// Utilities
-	HRESULT addMain	( nElement * );
-	HRESULT addWork	( nElement * );
-	HRESULT addStore	( const WCHAR *, const ADTVALUE & );
-	HRESULT getParent	( const WCHAR *, nElement ** );
-	HRESULT setRoot	( nElement *, const WCHAR * );
+	HRESULT	addMain		( InTick * );
+	HRESULT	addWork		( InTick * );
+	HRESULT	addStore		( const WCHAR *, const ADTVALUE & );
+//	HRESULT	getParent	( const WCHAR *, nElement ** );
+	void		init			( AnSpace *, const WCHAR *, int );
+//	HRESULT	setRoot		( nElement * );
  
-	// Called when the game starts or when spawned
+	// 'AActor' members
 	virtual void BeginPlay	() override;
 	virtual void EndPlay		( const EEndPlayReason::Type ) override;
 	
+	// 'InTick' memebers
+	virtual bool tickMain	( float );				// Main thread ticking
+	virtual bool tickWork	( void );				// Worker thread ticking
+
 	// Internal utilities
 	HRESULT onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 	};

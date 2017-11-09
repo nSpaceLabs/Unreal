@@ -7,22 +7,21 @@
 #include "nLabel.generated.h"
 
 UCLASS()
-class UnLabel : 
-	public UnElement
+class AnLabel : 
+	public AnElement
 	{
 	GENERATED_BODY()
 	
 	public:	
 	// Sets default values for this actor's properties
-	UnLabel();
-	virtual ~UnLabel();
+	AnLabel();
+	virtual ~AnLabel();
 
-	// Base class memebers
-	virtual void InitializeComponent		( void ) override;
-	virtual void UninitializeComponent	( void ) override;
-	virtual void onRay						( IDictionary *, const FVector &, const FVector & ) override;
- 	virtual USceneComponent *getSceneComponent ( void )
-		{ return pcLbl; }
+	// 'AnElement' class memebers
+	virtual void	BeginPlay() override;
+	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
+	virtual bool	tickMain	( float ) override;
+	virtual bool	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & ) override;
 
 	// Text rendering
 	UTextRenderComponent	*pcLbl;
@@ -36,12 +35,8 @@ class UnLabel :
 	int			iXs;
 	int			iCaret,iCaretP;
 
-	// Utilities
-	virtual bool	mainTick		( float );
-	virtual bool	onReceive	( nElement *, const WCHAR *, const WCHAR *, const ADTVALUE &);
-
 	private :
 
 	// Internal utilities	
 	void measure ( void );
-};
+	};

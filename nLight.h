@@ -9,29 +9,28 @@
  * 
  */
 UCLASS()
-class UnLight : public UnElement
+class AnLight : 
+	public AnElement
 	{
 	GENERATED_BODY()
 	
 	public:	
 
 	// Sets default values for this actor's properties
-	UnLight();
+	AnLight();
 
 	// Run-time data
+	ULightComponent		*pcLight;					// Light component
 	adtString				strType;						// Type
+	bool						bType;						// Type update
 	adtFloat					fIntense;					// Intensity
 	bool						bIntense;					// Intensity update
-	ULightComponent		*pcLight;					// Game engine component
 
-	// Base class memebers
-	virtual void InitializeComponent		( void ) override;
-	virtual void UninitializeComponent	( void ) override;
-	virtual USceneComponent *getSceneComponent ( void )
-		{ return pcLight; }
+	// 'AnElement' class memebers
+	virtual void	BeginPlay() override;
+	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
+	virtual bool	tickMain	( float ) override;
+	virtual bool	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & ) override;
 
-	// Utilities
-	virtual bool	mainTick		( float );
-	virtual bool	onReceive	( nElement *, const WCHAR *, const WCHAR *, const ADTVALUE &);
 
 	};

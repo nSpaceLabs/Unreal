@@ -1,6 +1,6 @@
 #include "nLight.h"
 
-UnLight::UnLight()
+AnLight::AnLight()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -10,12 +10,14 @@ UnLight::UnLight()
 	////////////////////////////////////////////////////////////////////////
 
 	// Setup
-	pcLight	= NULL;
-	fIntense	= 5000.0f;
-	bIntense	= false;
-	}	// UnLight
+	pcLight		= NULL;
+	strType		= L"";
+	bType			= false;
+	fIntense		= 5000.0f;
+	bIntense		= false;
+	}	// AnLight
 
-void UnLight :: InitializeComponent ( void )
+void AnLight :: BeginPlay ( void )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -25,31 +27,20 @@ void UnLight :: InitializeComponent ( void )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnLight::InitializeComponent"));
+	UE_LOG(LogTemp, Warning, TEXT("AnLight::BeginPlay"));
 
 	// Base behaviour
-	UnElement::InitializeComponent();
-
-	// Create light component of the appropriate type
-	// TODO: More light types
-	pcLight				= NewObject<UPointLightComponent>
-								(this,UPointLightComponent::StaticClass());
-	pcLight->bVisible	= false;
-	pcLight->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
+	AnElement::BeginPlay();
 
 	// Necessary ?
-	pcLight->SetMobility(EComponentMobility::Movable);
+//	SetMobility(EComponentMobility::Movable);
 
 	// Defaults
-	pcLight->SetLightColor(FLinearColor(1.0f,1.0f,1.0f,1.0f));
-	pcLight->SetIntensity(fIntense);
+//	SetLightColor(FLinearColor(1.0f,1.0f,1.0f,1.0f));
+//	SetIntensity(fIntense);
+	}	// BeginPlay
 
-	// Place component in world
-	pcLight->RegisterComponent();
-
-	}	// InitializeComponent
-
-void UnLight :: UninitializeComponent ( void )
+void AnLight :: EndPlay ( const EEndPlayReason::Type rsn )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -59,21 +50,73 @@ void UnLight :: UninitializeComponent ( void )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnLight::UninitializeComponent"));
-
-	// Shape
-	if (pcLight != NULL)
-		{
-		pcLight->bVisible			= false;
-		pcLight->bHiddenInGame	= true;
-		pcLight						= NULL;
-		}	// if
+	UE_LOG(LogTemp, Warning, TEXT("AnLight::EndPlay"));
 
 	// Base behaviour
-	UnElement::UninitializeComponent();
-	}	// UninitializeComponent
+	AnElement::EndPlay(rsn);
+	}	// EndPlay
 
-bool UnLight :: mainTick ( float fD )
+bool AnLight :: onValue (	const WCHAR *pwRoot, 
+									const WCHAR *pwLoc,
+									const ADTVALUE &v )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	OVERLOAD
+	//	FROM		nSpaceClientCB
+	//
+	//	PURPOSE
+	//		-	Called when a listened location receives a value.
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	v is the value
+	//
+	//	RETURN VALUE
+	//		true if there is main game loop to be scheduled.
+	//
+	////////////////////////////////////////////////////////////////////////
+	bool	bSch	= false;
+
+	// Debug
+//	UE_LOG(LogTemp, Log, TEXT("AnLight::onValue:%s:%s"), pwRoot, pwLoc );
+
+	// Base behaviour
+	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+
+	// Color
+	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
+		{
+		// Color update
+		iColor= adtInt(v);
+		bColor= true;
+		bSch	= true;
+		}	// if
+
+	// Type
+	else if (!WCASECMP(pwLoc,L"Type/OnFire/Value"))
+		{
+		// Light type update
+		adtValue::copy ( adtString(v), strType );
+ 		strType.at();
+		bType	= true;
+		bSch	= true;
+		}	// if
+
+	// Intensity
+	else if (!WCASECMP(pwLoc,L"Intensity/OnFire/Value"))
+		{
+		// Shape Type update
+		fIntense = adtFloat(v);
+		bIntense	= true;
+		bSch		= true;
+		}	// if
+
+	return bSch;
+	}	// onValue
+
+bool AnLight :: tickMain ( float fD )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -91,10 +134,10 @@ bool UnLight :: mainTick ( float fD )
 	bool		bWrk = false;
 
 	// Default behaviour
-	bWrk = UnElement::mainTick(fD);
+	bWrk = AnElement::tickMain(fD);
 
 	// Color
-	if (bColor && pcLight != NULL)
+	if (bColor)
 		{
 		FLinearColor	clr	(	((iColor>>16)&0xff)/255.0,
 										((iColor>>8)&0xff)/255.0,
@@ -102,78 +145,51 @@ bool UnLight :: mainTick ( float fD )
 										((iColor>>24)&0xff)/255.0 );
 
 		// Update
-		pcLight->SetLightColor(clr);
+		if (pcLight != NULL)
+			pcLight->SetLightColor(clr);
 		bColor = false;
 		}	// if
 
 	// Intensity
-	if (bIntense && pcLight != NULL)
+	if (bIntense)
 		{
 		// Update
-		pcLight->SetIntensity(fIntense);
+		if (pcLight != NULL)
+			pcLight->SetIntensity(fIntense);
 		bIntense = false;
 		}	// if
 
 	// Allow to change type on the fly ?
+	if (bType)
+		{
+		// Allow dynamic changes of light type ?
+		if (pcLight == NULL && strType.length() > 0)
+			{
+			// Create the appropriate light type
+			if (!WCASECMP(strType,L"Point"))
+				pcLight				= NewObject<UPointLightComponent>
+											(this,UPointLightComponent::StaticClass());
+
+			// Valid light type ?
+			if (pcLight != NULL)
+				{
+				// Activate component
+				pcLight->RegisterComponent();
+
+				//	Load defaults into new component
+				bColor	= true;
+				bIntense	= true;
+
+				// Root component has changed
+				SetRootComponent(pcLight);
+				rootUpdate();
+				pcLight->SetVisibility(true,true);
+				}	// if
+			}	// if
+
+		// Complete
+		bType = false;
+		}	// if
 
 	return bWrk;
-	}	// mainTick
-
-bool UnLight :: onReceive (	nElement *pElem,
-											const WCHAR *pwRoot, 
-											const WCHAR *pwLoc,
-											const ADTVALUE &v )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
-	//
-	//	PURPOSE
-	//		-	Called when a listened location receives a value.
-	//
-	//	PARAMETERS
-	//		-	pElem is the nSpace element
-	//		-	pwRoot is the path to the listened location
-	//		-	pwLoc is the location relative to the root for the value
-	//		-	v is the value
-	//
-	//	RETURN VALUE
-	//		true if there is main game loop to be scheduled.
-	//
-	////////////////////////////////////////////////////////////////////////
-	bool	bSch	= false;
-
-	// Base behaviour
-	bSch = UnElement::onReceive(pElem,pwRoot,pwLoc,v);
-
-	// Color
-	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
-		{
-		// Color update
-		iColor= adtInt(v);
-		bColor= true;
-		bSch	= true;
-		}	// if
-
-	// Type
-	else if (!WCASECMP(pwLoc,L"Type/OnFire/Value"))
-		{
-		// Shape Type update
-		adtValue::copy ( adtString(v), strType );
- 		strType.at();
-		bSch	= true;
-		}	// if
-
-	// Intensity
-	else if (!WCASECMP(pwLoc,L"Intensity/OnFire/Value"))
-		{
-		// Shape Type update
-		fIntense = adtFloat(v);
-		bIntense	= true;
-		bSch		= true;
-		}	// if
-
-	return bSch;
-	}	// onReceive
-
+	}	// tickMain

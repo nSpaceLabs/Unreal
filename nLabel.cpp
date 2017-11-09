@@ -1,6 +1,6 @@
 #include "nLabel.h"
 
-UnLabel::UnLabel()
+AnLabel::AnLabel()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -13,9 +13,12 @@ UnLabel::UnLabel()
 	iXs		= 0;
 	iCaret	= -2;
 	iCaretP	= -2;
-	}	// UnLabel
+	pcLbl		= NULL;
+	pcCrt		= NULL;
+	pcBox		= NULL;
+	}	// AnLabel
 
-UnLabel::~UnLabel()
+AnLabel::~AnLabel()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -25,25 +28,25 @@ UnLabel::~UnLabel()
 	////////////////////////////////////////////////////////////////////////
 	if (pfXs != NULL)
 		delete[] pfXs;
-	}	// ~UnLabel
+	}	// ~AnLabel
 
-void UnLabel :: InitializeComponent ( void )
+void AnLabel::BeginPlay()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Starts gameplay for this component
+	//		-	Called when the game starts or when spawned.
 	//
 	////////////////////////////////////////////////////////////////////////
-	float			fSclMax;
-	FVector		fV;
-//	FTransform	fX;
+	HRESULT	hr = S_OK;
+	float		fSclMax;
+	FVector	fV;
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnLabel::InitializeComponent"));
+	UE_LOG(LogTemp, Warning, TEXT("AnSpace::BeginPlay"));
 
-	// Base behaviour
-	UnElement::InitializeComponent();
+	// Default behaviour
+	Super::BeginPlay();
 
 	// Create label sub-component
 	pcLbl								= NewObject<UTextRenderComponent>(this,UTextRenderComponent::StaticClass());
@@ -51,7 +54,8 @@ void UnLabel :: InitializeComponent ( void )
 	pcLbl->VerticalAlignment	= EVerticalTextAligment::EVRTA_TextCenter;
 	pcLbl->bVisible				= true;				// Debug
 	pcLbl->bHiddenInGame			= false;
-	pcLbl->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
+	SetRootComponent(pcLbl);
+//	pcLbl->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
 	pcLbl->RegisterComponent();
 
 	// Compute local scaling necessary to fit one average letter inside
@@ -109,9 +113,9 @@ void UnLabel :: InitializeComponent ( void )
 	pcCrt->RegisterComponent();
 	pcCrt->SetText ( FText::FromString("^") );
 	pcCrt->SetTextRenderColor ( FColor ( 0xff404040 ) );
-	}	// InitializeComponent
+	}	// BeginPlay
 
-void UnLabel :: UninitializeComponent ( void )
+void AnLabel :: EndPlay ( const EEndPlayReason::Type rsn )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -121,7 +125,7 @@ void UnLabel :: UninitializeComponent ( void )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnLabel::UninitializeComponent"));
+	UE_LOG(LogTemp, Warning, TEXT("AnLabel::EndPlay"));
 
 	// Unregistering component causes a breakpoint in engine.
 	// Already taken care of ?
@@ -157,10 +161,126 @@ void UnLabel :: UninitializeComponent ( void )
 		}	// if
 
 	// Base behaviour
-	UnElement::UninitializeComponent();
-	}	// UninitializeComponent
+	Super::EndPlay(rsn);
+	}	// EndPlay
 
-bool UnLabel :: mainTick ( float fD )
+void AnLabel :: measure ( void )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Measure the current string assigned to the label
+	//
+	////////////////////////////////////////////////////////////////////////
+	FString	str;
+	int		i;
+
+	// Previous state
+	if (pfXs != NULL)
+		{
+		delete[] pfXs;
+		pfXs = NULL;
+		iXs = 0;
+		}	// if
+
+	// Current text for label
+	str	= pcLbl->Text.ToString();
+
+	// Allocate room for values
+	if ((iXs = str.Len()) >= 0)
+		pfXs = new float[++iXs];
+
+	// Obtain the beginning X position of each character by measuring the string
+	// one character at a time.
+	for (i = 0;i < iXs;++i)
+		{
+		// Obtain current string
+		FString strSub = str.Left(i);
+
+		// Compute how wide the substring is
+		int32 sz = pcLbl->Font->GetStringSize(*strSub);
+
+		// Assign new position
+		pfXs[i] = sz;
+		}	// for
+
+	}	// measure
+
+bool AnLabel :: onValue (	const WCHAR *pwRoot, 
+									const WCHAR *pwLoc,
+									const ADTVALUE &v )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	OVERLOAD
+	//	FROM		nSpaceClientCB
+	//
+	//	PURPOSE
+	//		-	Called when a listened location receives a value.
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	v is the value
+	//
+	//	RETURN VALUE
+	//		true if there is main game loop to be scheduled.
+	//
+	////////////////////////////////////////////////////////////////////////
+	bool	bSch	= false;
+
+	// Debug
+//	UE_LOG(LogTemp, Log, TEXT("AnLabel::onValue:%s:%s"), pwRoot, pwLoc );
+
+	// Base behaviour
+	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+
+	// Text for label
+//	if (	!WCASECMP(pwLoc,L"Element/Label/OnFire/Value") ||
+//	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/Value/OnFire/Value") )
+	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/OnFire/Value") )
+		{
+		adtString strV(v);
+
+		// Debug
+//		dbgprintf ( L"AnLabel::onReceive:%s:%s:%s\r\n",	
+//						pwLoc, (LPCWSTR)pParent->strLoc, (LPCWSTR)adtString(v) );
+
+		// Label to update
+		if (strV.length() > 0)
+			{
+			// Own the string
+			strLbl = (LPCWSTR) strV;
+			strLbl.at();
+			bSch = true;
+			}	// if
+		}	// if
+
+	// Alignment
+	else if (!WCASECMP(pwLoc,L"AlignHorz/OnFire/Value"))
+		{
+		adtValue::toString ( v, strHorz );
+		strHorz.at();
+		bSch		= true;
+		}	// if
+	else if (!WCASECMP(pwLoc,L"AlignVert/OnFire/Value"))
+		{
+		adtValue::toString ( v, strVert );
+		strVert.at();
+		bSch		= true;
+		}	// if
+
+	// Caret position
+	else if (!WCASECMP(pwLoc,L"Caret/OnFire/Value"))
+		{
+		iCaret	= adtInt(v);
+		bSch		= true;
+		}	// if
+
+	return bSch;
+	}	// onValue
+
+bool AnLabel :: tickMain ( float fD )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -178,7 +298,7 @@ bool UnLabel :: mainTick ( float fD )
 	bool		bWrk = false;
 
 	// Default behaviour
-	bWrk = UnElement::mainTick(fD);
+	bWrk = AnElement::tickMain(fD);
 
 	// Label ?
 	if (strLbl[0] != '\0')
@@ -290,51 +410,10 @@ bool UnLabel :: mainTick ( float fD )
 		}	// if
 
 	return bWrk;
-	}	// mainTick
+	}	// tickMain
 
-void UnLabel :: measure ( void )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Measure the current string assigned to the label
-	//
-	////////////////////////////////////////////////////////////////////////
-	FString	str;
-	int		i;
-
-	// Previous state
-	if (pfXs != NULL)
-		{
-		delete[] pfXs;
-		pfXs = NULL;
-		iXs = 0;
-		}	// if
-
-	// Current text for label
-	str	= pcLbl->Text.ToString();
-
-	// Allocate room for values
-	if ((iXs = str.Len()) >= 0)
-		pfXs = new float[++iXs];
-
-	// Obtain the beginning X position of each character by measuring the string
-	// one character at a time.
-	for (i = 0;i < iXs;++i)
-		{
-		// Obtain current string
-		FString strSub = str.Left(i);
-
-		// Compute how wide the substring is
-		int32 sz = pcLbl->Font->GetStringSize(*strSub);
-
-		// Assign new position
-		pfXs[i] = sz;
-		}	// for
-
-	}	// measure
-
-void UnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
+/*
+void AnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
 									const FVector &vDir )
 	{
 	////////////////////////////////////////////////////////////////////////
@@ -356,7 +435,7 @@ void UnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
 
 	// Compute the floating point position of the button event inside
 	// the current string.  
-//	dbgprintf ( L"UnLabel::onInput:%g,%g,%g\r\n", vAt.X, vAt.Y, vAt.Z );
+//	dbgprintf ( L"AnLabel::onInput:%g,%g,%g\r\n", vAt.X, vAt.Y, vAt.Z );
 
 	// Extent of box surrounding text and receving input
 	szBox = pcBox->GetUnscaledBoxExtent();
@@ -366,7 +445,7 @@ void UnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
 	fX = (szBox.Y - vLoc.Y);
 	fY = (vLoc.Z + szBox.Z);
 
-//	dbgprintf ( L"UnLabel::onInput:Box:%g,%g:%g,%g: (%g,%g,%g)\r\n", 
+//	dbgprintf ( L"AnLabel::onInput:Box:%g,%g:%g,%g: (%g,%g,%g)\r\n", 
 //						vLoc.Y, vLoc.Z, fX, fY, szBox.X, szBox.Y, szBox.Z );
 
 	// TODO: Better way to do this ?
@@ -402,102 +481,10 @@ void UnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
 		iAt	= iXs;
 
 	// Store position of event withing string in dictionary
-	dbgprintf ( L"UnLabel::onInput:At:%g\r\n", (iAt+fAt) );
+	dbgprintf ( L"AnLabel::onInput:At:%g\r\n", (iAt+fAt) );
 	CCLTRY ( pDct->store ( adtString(L"Index"), adtFloat((iAt+fAt)) ) );
 
 	// Default behaviour
 	CCLOK ( UnElement::onRay(pDct,vLoc,vDir); )
 	}	// onRay
-
-bool UnLabel :: onReceive (	nElement *pElem,
-										const WCHAR *pwRoot, 
-										const WCHAR *pwLoc,
-										const ADTVALUE &v )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
-	//
-	//	PURPOSE
-	//		-	Called when a listened location receives a value.
-	//
-	//	PARAMETERS
-	//		-	pElem is the nSpace element
-	//		-	pwRoot is the path to the listened location
-	//		-	pwLoc is the location relative to the root for the value
-	//		-	v is the value
-	//
-	//	RETURN VALUE
-	//		true if there is main game loop to be scheduled.
-	//
-	////////////////////////////////////////////////////////////////////////
-	bool			bA1	= false;
-	bool			bA2	= false;
-	bool			bA3	= false;
-	bool			bSch	= false;
-
-	// Base behaviour
-	bSch = UnElement::onReceive(pElem,pwRoot,pwLoc,v);
-
-	// Text for label
-//	if (	!WCASECMP(pwLoc,L"Element/Label/OnFire/Value") ||
-//	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/Value/OnFire/Value") )
-	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/OnFire/Value") )
-		{
-		adtString strV(v);
-
-		// Debug
-//		dbgprintf ( L"UnLabel::onReceive:%s:%s:%s\r\n",	
-//						pwLoc, (LPCWSTR)pParent->strLoc, (LPCWSTR)adtString(v) );
-
-		// Label to update
-		if (strV.length() > 0)
-			{
-			// Own the string
-			strLbl = (LPCWSTR) strV;
-			strLbl.at();
-			bSch = true;
-			}	// if
-		}	// if
-
-	// Alignment
-	else if (!WCASECMP(pwLoc,L"AlignHorz/OnFire/Value"))
-		{
-		adtValue::toString ( v, strHorz );
-		strHorz.at();
-		bSch		= true;
-		}	// if
-	else if (!WCASECMP(pwLoc,L"AlignVert/OnFire/Value"))
-		{
-		adtValue::toString ( v, strVert );
-		strVert.at();
-		bSch		= true;
-		}	// if
-
-	// Caret position
-	else if (!WCASECMP(pwLoc,L"Caret/OnFire/Value"))
-		{
-		iCaret	= adtInt(v);
-		bSch		= true;
-		}	// if
-
-	return bSch;
-	}	// onReceive
-
-/*
-// Called when the game starts or when spawned
-void UnLabel::BeginPlay()
-{
-	Super::BeginPlay();
-	
-}
-
-// Called every frame
-void UnLabel::Tick( float DeltaTime )
-{
-	Super::Tick( DeltaTime );
-
-}
-
 */

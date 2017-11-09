@@ -11,8 +11,95 @@
 // different threads
 #define	ELEM_STATE_ERROR			-1					// Element in error state
 #define	ELEM_STATE_INIT			0					// Initialize element
-#define	ELEM_STATE_LISTEN			1					// Initialize element
+#define	ELEM_STATE_LISTEN			1					// Perform element listen
 #define	ELEM_STATE_RUN				2					// Element running
+#define	ELEM_STATE_STOP			3					// Perform element shutdown
+
+// Forward decs.
+class AnElement;
+
+//
+// Class - nElementRef.  Wrapper class to hold an 'nElement' reference.
+//		This class is basically so that actors can be referenced counted
+//		using the nSpace object model and stored in dictionaries.
+//
+
+class nElementRef :
+	public CCLObject
+	{
+	public :
+	nElementRef ( AnElement *_pElem )				// Constructor
+		{ pElem = _pElem; AddRef(); }
+	virtual ~nElementRef ( void ) {};				// Destructor
+
+	// Run-time data
+	AnElement	*pElem;									// Actor reference
+
+	// CCL
+	CCL_OBJECT_BEGIN_INT(nElementRef)
+	CCL_OBJECT_END()
+	};
+
+//
+// Class - AnElement.  An element actor handles a single visual element location.
+//		It acts as the root actor for the components that make up the visual.
+//
+
+UCLASS()
+class AnElement : 
+	public AActor,											// Base class
+	public nSpaceClientCB,								// Callback
+	public InTick											// Callback
+	{
+	GENERATED_BODY()
+
+	public:	
+	AnElement();											// Constructor
+	virtual ~AnElement();								// Destructor
+
+	// Run-time data
+	AnLoc			*pLoc;									// Parent render location actor
+	adtString	strLoc;									// Location of element state
+	adtString	strLstn;									// Listen location
+	bool			bRun;										// Element running
+	int			iState;									// Element state
+
+	// State
+	FVector		fTi,fTf,fS,fR;							// Target transformations
+	bool			bTrans;									// Translation updated
+	FVector		fTt;										// Time for translation
+	FVector		fSclLcl;									// Local scaling (if needed)
+	bool			bScl;										// Scaling update
+	FVector		fRotNow;									// Current rotation
+	bool			bRot[3];									// Rotation update
+	int			iVisible;								// Visible update
+	int			iColor;									// 32-bit color
+	bool			bColor;									// Color update required
+
+	// Utilities
+	void	init			( AnLoc *, const WCHAR * );// Initialize state
+	void	rootUpdate	( void );						// Root component has changed
+
+	// 'AnElement' members
+	virtual bool onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
+
+	// 'AActor' members
+	virtual void BeginPlay	() override;
+	virtual void EndPlay		( const EEndPlayReason::Type ) override;
+
+	// 'InTick' memebers
+	virtual bool tickMain	( float );				// Main thread ticking
+	virtual bool tickWork	( void );				// Worker thread ticking
+
+	// 'nSpaceClientCB' members
+	STDMETHOD(onReceive)	( const WCHAR *, const WCHAR *, const ADTVALUE & );
+
+	};
+
+/*
+// Definitions
+#define	SZ_TIME_MOVE			1.0					// Seconds to move
+
 
 // Forward decs.
 class AnActor;
@@ -21,33 +108,42 @@ class AnActor;
 // Class - nElement.  Base class for nSpace visual elements.
 //
 
-class UnElement;
 class nElement : 
 	public CCLObject,										// Base class
-	public nSpaceClientCB								// Callback function
+	public nSpaceClientCB,								// Callback
+	public InTick											// Callback
 	{
 	public:	
-	nElement ( const WCHAR *, const WCHAR *,		// Constructor
-					AnLoc * );
-	nElement ( AnActor *,								// Constructor
-					const WCHAR *, int );
+	nElement	( void );									// Constructor
 
 	// Run-time data
 	AnActor		*pRen;									// Master render object
 	AnLoc			*pRenLoc;								// Render location
-	UnElement	*pRoot;									// Root scene component for this element
 	adtString	strLoc,strDef;							// Namespace location and definition
-	adtString	strLstn;									// Listen location
 	bool			bRun;										// Element running
 	int			iRoot;									// Index for root elements
 	int			iState;									// Element state
 
-	// Utilities
-	bool mainTick	( float );							// Main thread ticking
-	bool workTick	( void );							// Worker thread ticking
+	// Component
+	AActor		*pOuter;									// Outer actor dervied from this element
+	FVector		fTi,fTf,fS,fR;							// Target transformations
+	FVector		fTt;										// Time for translation
+	FVector		fSclLcl;									// Local scaling (if needed)
+	FVector		fRotNow;									// Current rotation
+	bool			bRot[3];									// Rotation update
+	int			iVisible;								// Visible update
+	int			iColor;									// 32-bit color
+	bool			bColor;									// Color update required
 
-	// 'nSpaceClientCB' members
-	STDMETHOD(onReceive)	( const WCHAR *, const WCHAR *, const ADTVALUE & );
+	// Utilities
+	void init		( AnLoc *, const ADTVALUE & );// Initialize state
+
+
+
+	// Custom events
+	virtual void	onButton		( IDictionary *, const WCHAR *, const WCHAR * );
+	virtual void	onRay			( IDictionary *, const FVector &, const FVector & );
+
 
 	// CCL
 	CCL_OBJECT_BEGIN_INT(nElement)
@@ -56,55 +152,4 @@ class nElement :
 	virtual void		destruct		( void );		// Destruct object
 	
 	};
-
-//
-// Class - UnElement.  Unreal scene component for nSpace visual element.
-//
-
-UCLASS()
-class UnElement : 
-	public USceneComponent
-	{
-	GENERATED_BODY()
-	
-	public:	
-
-	// Sets default values for this actor's properties
-	UnElement ();											// Constructor
-
-	// Run-time data
-	nElement	*pParent;									// Parent object
-	FVector	fTi,fTf,fS,fR;								// Target transformations
-	FVector	fTt;											// Time for translation
-	FVector	fSclLcl;										// Local scaling (if needed)
-	FVector	fRotNow;										// Current rotation
-	bool		bRot[3];										// Rotation update
-	int		iVisible;									// Visible update
-	int		iColor;										// 32-bit color
-	bool		bColor;										// Color update required
-
-	// Base class memebers
-	virtual void	InitializeComponent		( void ) override;
-	virtual void	UninitializeComponent	( void ) override;
-
-	// Utilities
-	virtual void	inputAdd		( UPrimitiveComponent * );
-	virtual bool	mainTick		( float );
-	virtual bool	onReceive	( nElement *, const WCHAR *, const WCHAR *, const ADTVALUE & );
-	virtual USceneComponent *getSceneComponent ( void )
-		{ return NULL; }
-
-	// Custom events
-	virtual void	onButton		( IDictionary *, const WCHAR *, const WCHAR * );
-	virtual void	onRay			( IDictionary *, const FVector &, const FVector & );
-
-	// Events
-	UFUNCTION()
-	void OnOverBegin	( UPrimitiveComponent *TouchedComponent );
-	UFUNCTION()
-	void OnOverEnd		( UPrimitiveComponent *TouchedComponent );
-	UFUNCTION()
-	void OnClicked		( UPrimitiveComponent *TouchedComponent, FKey ButtonPressed );
-	UFUNCTION()
-	void OnReleased	( UPrimitiveComponent *TouchedComponent, FKey ButtonPressed );
-	};
+*/

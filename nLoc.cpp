@@ -4,6 +4,11 @@
 //#include "nSpcLbl.h"
 #include "nElement.h"
 
+// Element types
+#include "nLight.h"
+#include "nShape.h"
+#include "nLabel.h"
+
 AnLoc :: AnLoc()
 	{
 	////////////////////////////////////////////////////////////////////////
@@ -20,9 +25,11 @@ AnLoc :: AnLoc()
 	////////////////////////////////////////////////////////////////////////
 
 	// Setup
-	pRen			= NULL;
+	pSpc			= NULL;
 	strLocRen	= L"";
 	pDctRen		= NULL;
+	pActQ			= NULL;
+	pActIt		= NULL;
 
 	// String references
 	strRefActor = L"Actor";
@@ -41,24 +48,27 @@ AnLoc :: ~AnLoc()
 	//		-	Destructor for the object.
 	//
 	////////////////////////////////////////////////////////////////////////
+	_RELEASE(pActQ);
+	_RELEASE(pActIt);
 	_RELEASE(pDctRen);
 	}	// AnLoc
 
-HRESULT AnLoc :: addMain ( nElement *pElem )
+HRESULT AnLoc :: addMain ( InTick *pTick )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Add element to main queue.
+	//		-	Add object to main game loop for ticking.
 	//
 	//	PARAMETERS
-	//		-	pElem is the element.
+	//		-	pTick is the tickable object.
 	//
 	//	RETURN VALUE
 	//		S_OK if successful
 	//
 	////////////////////////////////////////////////////////////////////////
-	return (pRen != NULL) ? pRen->addMain ( pElem ) : S_FALSE;
+	lprintf ( LOG_INFO, L"pTick %p lTick %ld", pTick, (U64)pTick );
+	return (pSpc != NULL) ? pSpc->addMain ( pTick ) : S_FALSE;
 	}	// addMain
 
 HRESULT AnLoc :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v )
@@ -77,28 +87,88 @@ HRESULT AnLoc :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v )
 	//		S_OK if successful
 	//
 	////////////////////////////////////////////////////////////////////////
-	return (pRen != NULL) ? pRen->addStore ( pwLoc, v, strLocRen ) : S_FALSE;
+	return (pSpc != NULL) ? pSpc->addStore ( pwLoc, v, strLocRen ) : S_FALSE;
 	}	// addStore
 
-HRESULT AnLoc :: addWork ( nElement *pElem )
+HRESULT AnLoc :: addWork ( InTick *pTick )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Add element to worker queue.
+	//		-	Add object to worker thread for ticking.
 	//
 	//	PARAMETERS
-	//		-	pElem is the element.
+	//		-	pTick is the tickable object.
 	//
 	//	RETURN VALUE
 	//		S_OK if successful
 	//
 	////////////////////////////////////////////////////////////////////////
-	return (pRen != NULL) ? pRen->addWork ( pElem ) : S_FALSE;
+	return (pSpc != NULL) ? pSpc->addWork ( pTick ) : S_FALSE;
 	}	// addWork
 
+void AnLoc::BeginPlay()
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Called when play beings for this actor.
+	//
+	////////////////////////////////////////////////////////////////////////
+	HRESULT	hr			= S_OK;
+//	AnGroup	*pElem	= NULL;
+
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("AnLoc::BeginPlay"));
+
+	// Base beahviour
+	Super::BeginPlay();
+
+	// Create queue for scheduling actor spawning from main game loop
+	CCLTRY ( COCREATE ( L"Adt.Queue", IID_IList, &pActQ ) );
+	CCLTRY ( pActQ->iterate ( &pActIt ) );
+
+	// Schedule some worker time to perform setup on location
+	CCLOK ( pSpc->addWork(this); )
+
+/*
+	// Spawn a top level group actor to act as root for visuals.
+	CCLTRYE ( (pElem = Cast<AnGroup>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+					this,AnGroup::StaticClass(),FTransform()))) != NULL, E_UNEXPECTED );
+	CCLOK   ( pElem->init ( this, adtInt(iIdx) ); )
+	CCLOK ( UGameplayStatics::FinishSpawningActor(pElem,FTransform()); )
+
+	// Actor is running, allow internal construction
+	CCLOK ( pElem->construct(); )
+*/
+	}	// BeginPlay
+
+void AnLoc::EndPlay(const EEndPlayReason::Type rsn )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Called when play ends for this actor.
+	//
+	////////////////////////////////////////////////////////////////////////
+
+	// Debug
+	UE_LOG(LogTemp, Warning, TEXT("AnLoc::EndPlay"));
+
+	// Ensure shutdown
+//	setRender ( NULL, L"" );
+
+	// Clean up
+	_RELEASE(pActQ);
+	_RELEASE(pActIt);
+
+	// Base behaviour
+	Super::EndPlay(rsn);
+	}	// EndPlay
+
+/*
 HRESULT AnLoc :: getParent (	const WCHAR *pwLoc, 
-														nElement **ppElem )
+										nElement **ppElem )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -150,6 +220,7 @@ HRESULT AnLoc :: getParent (	const WCHAR *pwLoc,
 		{
 		IDictionary		*pDctChk = NULL;
 		IIt				*pKeys	= NULL;
+*/
 /*
 		// Debug
 		dbgprintf ( L"AnLoc::parent:At %p (%p)\r\n", pDct, pDctRen );
@@ -166,6 +237,7 @@ HRESULT AnLoc :: getParent (	const WCHAR *pwLoc,
 				}	// if
 			}	// if
 */
+/*
 		// Parent dictionary
 		CCLTRY ( pDct->load ( strnRefPar, vL ) );
 		_RELEASE(pDct);
@@ -215,7 +287,26 @@ HRESULT AnLoc :: getParent (	const WCHAR *pwLoc,
 		dbgprintf ( L"AnLoc::parent:%s\r\n", pwLoc );
 
 	return hr;
-	}	// geParent
+	}	// getParent
+*/
+
+void AnLoc :: init (	AnSpace *_pSpc, const WCHAR *_pwLoc, int _iIdx )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Initializer for the object.
+	//
+	//	PARAMETERS
+	//		-	_pSpc is the master render object
+	//		-	_pwLoc is the render location for this object
+	//		-	_iIdx is the index of the root element in master render list
+	//
+	////////////////////////////////////////////////////////////////////////
+	pSpc			= _pSpc;
+	strLocRen	= _pwLoc;
+	iIdx			= _iIdx;
+	}	// init
 
 HRESULT AnLoc :: onValue (	const WCHAR *pwRoot, 
 									const WCHAR *pwLoc,
@@ -238,8 +329,13 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 	////////////////////////////////////////////////////////////////////////
 	HRESULT		hr			= S_OK;
 	size_t		len;
+	adtString	strV;
 
-	// This object just watches for changes to '_Location's which identify
+	// Debug
+	adtValue::toString(vV,strV);
+//	CCLOK ( UE_LOG(LogTemp, Warning, TEXT("%s:%s:%s"), pwRoot, pwLoc, (LPCWSTR)strV ); )
+
+	// This object watches for changes to '_Location's which identify
 	// potential states that need to be rendered.
 	if (	hr == S_OK									&& 
 			(len = wcslen(pwLoc)) >= 9				&& 
@@ -250,60 +346,23 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 		// Remove _Location postfix for element
 		CCLOK ( strLoc.at(strLoc.length()-9) = '\0'; )
 
-		// Debug
-//		dbgprintf ( L"AnLoc::onValue:Root %s Location %s\r\n",
-//						pwRoot, pwLoc );
-
 		// New location ?
 		if (	vV.vtype == VTYPE_STR						&&
 				(len = wcslen(vV.pstr)) > 13				&&
 				!WCASENCMP(vV.pstr,L"State/Visual/",13) )
 			{
-			bool	bSupp = false;
+			// Add definition and location to actor for processing
+			CCLTRY(pActQ->write(vV));
+			CCLTRY(pActQ->write(strLoc));
 
-			// Supported visual state ?
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Label/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Group/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Shape/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Image/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"PointLight/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Input/Source/");
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Camera/");
-
-			// Rules
-			if (!bSupp) bSupp = !WCASECMP(&vV.pstr[13],L"Rule/Projectile/");
-
-			// Debug
-	//		dbgprintf ( L"AnLoc::onValue:%s:%s:%d:%s:%d\r\n",
-	//				pwRoot, pwLoc, vV.vtype, 
-	//				(vV.vtype == VTYPE_STR && vV.pstr != NULL) ? vV.pstr : L"<>", bSupp );
-
-			// Create an element to handle supported visual states
-			if (hr == S_OK && bSupp)
-				{
-				nElement	*pElem	= NULL;
-
-				// Construct element object
-				CCLTRYE ( (pElem = new nElement ( strLoc, vV.pstr, this )) 
-								!= NULL, E_OUTOFMEMORY );
-				_ADDREF(pElem);
-
-				// Store in render tree at location
-//				dbgprintf ( L"nSpcStoreValue:At %p Loc %s Value %p\r\n", 
-//								pDctRen, (LPCWSTR)strLoc, pElem );
-				CCLTRY ( nspcStoreValue ( pDctRen, pwLoc, adtIUnknown(pElem) ) );
-
-				// Initialize element
-				CCLTRY ( pElem->construct() );
-
-				// Clean up
-				_RELEASE(pElem);
-				}	// if
+			// Work to be done from game loop
+			CCLOK(addMain(this);)
 			}	// if
 
 		// Empty location
 		else if (adtValue::empty(vV))
 			{
+/*
 			WCHAR			*pw	= NULL;
 			adtIUnknown	unkV;
 			adtValue		vL;
@@ -341,11 +400,11 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 					// Element object is stored at location
 					if (hr == S_OK && pDctE->load ( strnRefLocn, vL ) == S_OK)
 						{
-						nElement	*pElem	= (nElement *)(vL.punk);
+//						nElement	*pElem	= (nElement *)(vL.punk);
 
 						// Mark element for destruction and schedule for work on game loop
-						pElem->bRun = false;
-						pRen->addMain ( pElem );
+//						pElem->bRun = false;
+//						pSpc->addMain ( pElem );
 						}	// if
 
 					// Clean up
@@ -360,21 +419,21 @@ HRESULT AnLoc :: onValue (	const WCHAR *pwRoot,
 				// Clean up
 				_RELEASE(pDctL);
 				}	// if
-
+*/
 			}	// else if
 
 		}	// if
 
 	return hr;
 	}	// onValue
-
-HRESULT AnLoc :: setRoot ( nElement *_pRoot, 
-													const WCHAR *_pLoc )
+/*
+HRESULT AnLoc :: setRoot ( nElement *_pRoot )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Set the root element state.
+	//		-	Set the root element state.  Called by the element created
+	//			in 'BeginPlay' from the worker thread during initialization.
 	//
 	//	PARAMETERS
 	//		-	_pRoot is the root element
@@ -393,7 +452,7 @@ HRESULT AnLoc :: setRoot ( nElement *_pRoot,
 		dbgprintf ( L"AnLoc::setRoot:Unlisten:%s\r\n",
 							(LPCWSTR)strLocRen );
 		if (strLocRen.length() > 0)
-			pRen->pCli->listen ( strLocRen, false );
+			pSpc->pCli->listen ( strLocRen, false );
 
 		// Clean up
 		_RELEASE(pCB);
@@ -403,9 +462,6 @@ HRESULT AnLoc :: setRoot ( nElement *_pRoot,
 	// New render setup
 	if (_pRoot != NULL)
 		{
-		// Render location
-		strLocRen	=	_pLoc;
-
 		// Create render dictionary
 		CCLTRY ( COCREATE ( L"Adt.Dictionary", IID_IDictionary, &pDctRen ) );
 
@@ -418,41 +474,171 @@ HRESULT AnLoc :: setRoot ( nElement *_pRoot,
 		CCLTRY ( pDctRen->store ( strnRefLocn, adtIUnknown(_pRoot) ) );
 
 		// Listen to location
-		CCLTRY ( pRen->pCli->listen ( strLocRen, true, pCB ) );
+		CCLTRY ( pSpc->pCli->listen ( strLocRen, true, pCB ) );
 		}	// if
 
 	return hr;
-	}	// setRender
-
-void AnLoc::BeginPlay()
+	}	// setRoot
+*/
+bool AnLoc :: tickMain ( float fD )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Called when play beings for this actor.
+	//		-	Execute work for main game thread.
+	//
+	//	PARAMETERS
+	//		-	fD is the amount of elapsed time since last game loop tick.
+	//
+	//	RETURN VALUE
+	//		true if work is still needed
 	//
 	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr = S_OK;
+	HRESULT	hr		= S_OK;
+	bool		bWrk	= false;
 
-	// Base beahviour
-	Super::BeginPlay();
-	}	// BeginPlay
+	// Spawn any actors
+	if (hr == S_OK && pActQ != NULL && pActQ->isEmpty() != S_OK)
+		{
+		adtValue		vV;
 
-void AnLoc::EndPlay(const EEndPlayReason::Type rsn )
+		// Processing all actors
+		CCLTRY(pActIt->begin());
+		while (hr == S_OK && pActIt->read(vV) == S_OK)
+			{
+			adtString	strDef,strLoc;
+
+			// Read definition and location
+			CCLTRY(adtValue::toString(vV,strDef));
+			CCLOK (pActIt->next();)
+			CCLTRY(pActIt->read(vV));
+			CCLTRY(adtValue::toString(vV,strLoc));
+			CCLOK (pActIt->next();)
+
+			// Valid actor ?
+			if (hr == S_OK && strDef.length() > 0 && strLoc.length() > 0)
+				{
+				AnElement	*pElem	= NULL;
+				adtString	strDefV	= &(strDef[13]);
+
+				// Debug
+				UE_LOG(LogTemp, Warning, TEXT("tickMain:Location:%s:%s"),
+							(LPCWSTR)strDef, (LPCWSTR)strLoc);
+
+				// Create appropriate actor to handle the visual state definition
+				if (!WCASECMP(strDefV,L"Shape/")) 
+					pElem = Cast<AnShape>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+													this,AnShape::StaticClass(),FTransform()));
+				else if (!WCASECMP(strDefV,L"Light/")) 
+					pElem = Cast<AnLight>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+													this,AnLight::StaticClass(),FTransform()));
+				else if (!WCASECMP(strDefV,L"Label/")) 
+					pElem = Cast<AnLabel>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+													this,AnLabel::StaticClass(),FTransform()));
+
+				// Valid element ?
+				CCLTRYE ( (pElem != NULL), E_NOTIMPL );
+
+				// Establish owner and location for actor
+				CCLOK ( pElem->init ( this, strLoc ); )
+
+				// Store in own render tree at location
+				CCLTRY ( nspcStoreValue ( pDctRen, strLoc, adtIUnknown(new nElementRef(pElem)) ) );
+
+				// Continue spawning
+				CCLOK ( UGameplayStatics::FinishSpawningActor(pElem,FTransform()); )
+
+/*
+			// Label
+			else if	(!WCASECMP(strDef,L"State/Visual/Label/"))
+				{
+				// Label component
+				CCLTRYE ( (pOuter = NewObject<UnLabel>(pSpcLoc,UnLabel::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+
+			// Shape
+			else if	(	!WCASECMP(strDef,L"State/Visual/Shape/") )
+				{
+				CCLTRYE ( (pShape = NewObject<UnShape>(pSpcLoc,UnShape::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				CCLOK   ( pOuter = pShape; )
+				}	// else if
+
+			// Camera
+//			else if	(	!WCASECMP(strDef,L"State/Visual/Camera/") )
+//				{
+//				CCLTRYE ( (pOuter = NewObject<UnCamera>(pSpcLoc,UnCamera::StaticClass()))
+//								!= NULL, E_UNEXPECTED );
+//				}	// else if
+
+			// Lights
+			else if	(	!WCASECMP(strDef,L"State/Visual/PointLight/") )
+				{
+				CCLTRYE ( (pOuter = NewObject<UnPointLight>(pSpcLoc,UnPointLight::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+
+			// Projectile
+			else if	(	!WCASECMP(strDef,L"State/Visual/Rule/Projectile/") )
+				{
+				CCLTRYE ( (pOuter = NewObject<UnProjectile>(pSpcLoc,UnProjectile::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+
+			// Input source
+//			else if	(	!WCASECMP(strDef,L"State/Visual/Input/Source/") )
+//				{
+//				CCLTRYE ( (pOuter = NewObject<UnSpcInSrc>(pSpcLoc,UnSpcInSrc::StaticClass()))
+//								!= NULL, E_UNEXPECTED );
+//				}	// else if
+
+			// Image
+			else if	(!WCASECMP(strDef,L"State/Visual/Image/"))
+				{
+				// Image component
+				CCLTRYE ( (pOuter = NewObject<UnImage>(pSpcLoc,UnImage::StaticClass()))
+								!= NULL, E_UNEXPECTED );
+				}	// else if
+*/
+
+
+				}	// if
+
+			}	// while
+
+		}	// if
+
+	return bWrk;
+	}	// tickMain
+
+bool AnLoc :: tickWork ( void )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Called when play ends for this actor.
+	//		-	Execute work for worker thread.
+	//
+	//	RETURN VALUE
+	//		true if element needs more work
 	//
 	////////////////////////////////////////////////////////////////////////
+	HRESULT	hr	= S_OK;
 
-	// Ensure shutdown
-//	setRender ( NULL, L"" );
+	// Create render dictionary
+	CCLTRY ( COCREATE ( L"Adt.Dictionary", IID_IDictionary, &pDctRen ) );
 
-	// Base behaviour
-	Super::EndPlay(rsn);
-	}	// EndPlay
+	// Calllback object for listens
+	CCLTRYE ( (pCB = new nLocCB ( this )) != NULL, E_OUTOFMEMORY );
+	_ADDREF(pCB);
+	CCLTRY ( pCB->construct() );
+
+	// Peform listen on target location
+	CCLTRY ( pSpc->pCli->listen ( strLocRen, true, pCB ) );
+
+	// No need for more work
+	return false;
+	}	// tickWork
 
 //
 // nSpaceRenderCB
@@ -588,7 +774,7 @@ HRESULT AnLoct :: tick ( void )
 			// Load value
 			pParent->pStIt->next();
 			if (pParent->pStIt->read ( vV ) == S_OK )
-				pParent->pRen->pCli->store ( vLoc.pstr, vV );
+				pParent->pSpc->pCli->store ( vLoc.pstr, vV );
 			}	// if
 
 		// Move to next vlaue
@@ -641,38 +827,38 @@ HRESULT AnLoct :: tickBegin ( void )
 					GetLastError() );
 
 	// Global mutext to sync between render locations
-	if (pParent->pRen->csRen.enter())
+	if (pParent->pSpc->csRen.enter())
 		{
 		// Does client need started ?
-		if (hr == S_OK && pParent->pRen->pCli == NULL)
+		if (hr == S_OK && pParent->pSpc->pCli == NULL)
 			{
 			// Create client
-			CCLTRYE((pParent->pRen->pCli = new nSpaceClient()) != NULL, E_OUTOFMEMORY);
+			CCLTRYE((pParent->pSpc->pCli = new nSpaceClient()) != NULL, E_OUTOFMEMORY);
 
 			// Open private namespace with own command line
-			CCLTRY(pParent->pRen->pCli->open(
+			CCLTRY(pParent->pSpc->pCli->open(
 						L"{ Execute Batch Location C:/dev/nspace/resource/record/install.nspc }", false, NULL));
 //						L"{ Executef Batch Location C:/dev/nspace/resource/record/install.nspc }", false, NULL));
 			}	// if
 
 		// Does cache need created ?
-		if (hr == S_OK && pParent->pRen->pImgC == NULL)
+		if (hr == S_OK && pParent->pSpc->pImgC == NULL)
 			{
 			// Construct a shared image cache object
-			CCLTRYE ( (pParent->pRen->pImgC = new nSpcImgCache ( pParent )) != NULL,
+			CCLTRYE ( (pParent->pSpc->pImgC = new nSpcImgCache ( pParent )) != NULL,
 							E_OUTOFMEMORY );
-			_ADDREF(pParent->pRen->pImgC);
-			CCLTRY ( pParent->pRen->pImgC->construct() );
+			_ADDREF(pParent->pSpc->pImgC);
+			CCLTRY ( pParent->pSpc->pImgC->construct() );
 			}	// if
 
 		// Clean up
-		pParent->pRen->csRen.leave();
+		pParent->pSpc->csRen.leave();
 		}	// if
 
 
 	// Debug test
 	if (hr == S_OK)
-		pParent->pRen->pCli->store(L"/apps/auto/default/Debug/Fire/Value",adtString(L"YouCanByteMeNow1"));
+		pParent->pSpc->pCli->store(L"/apps/auto/default/Debug/Fire/Value",adtString(L"YouCanByteMeNow1"));
 
 	// Debug
 //	if (hr != S_OK)

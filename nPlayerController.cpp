@@ -16,7 +16,7 @@ AnPlayerController::AnPlayerController(const FObjectInitializer &oi) :
  	// Set this actor to call Tick() every frame.  
 	// You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+/*
 	// Input
 	bShowMouseCursor			= true;
 	bEnableMouseOverEvents	= true;
@@ -26,6 +26,7 @@ AnPlayerController::AnPlayerController(const FObjectInitializer &oi) :
 	pRen			= NULL;
 	pElemCap	= NULL;
 	bElemCap	= false;
+*/
 	pDctRy	= NULL;
 	pDctBt	= NULL;
 	}	// AnPlayerController
@@ -42,18 +43,13 @@ void AnPlayerController::BeginPlay()
 	// Base beahviour
 	Super::BeginPlay();
 
-	// Always spawn nSpace renderer
-	pRen = GetWorld()->SpawnActor<AnActor>(
-				FVector(0,0,0),FRotator(0,0,0),FActorSpawnParameters());
+	// Always spawn nSpace object
+	GetWorld()->SpawnActor<AnSpace>(
+		FVector(0,0,0),FRotator(0,0,0),FActorSpawnParameters());
 
 	// Input dictionaries
 	COCREATE ( L"Adt.Dictionary", IID_IDictionary, &pDctRy );
 	COCREATE ( L"Adt.Dictionary", IID_IDictionary, &pDctBt );
-
-
-//	APlayerCameraManager
-//	*pMgr = this->PlayerCameraManager;
-//	dbgprintf ( L"AnPlayerController::BeginPlay:Manager %p\r\n", pMgr );
 
 	}	// BeginPlay
 
@@ -70,9 +66,9 @@ void AnPlayerController::EndPlay(const EEndPlayReason::Type rsn )
 	Super::EndPlay(rsn);
 
 	// Clean up
-	pRen		= NULL;
-	pElemCap	= NULL;
-	bElemCap	= false;
+//	pRen		= NULL;
+//	pElemCap	= NULL;
+//	bElemCap	= false;
 	_RELEASE(pDctRy);
 	_RELEASE(pDctBt);
 	}	// EndPlay
@@ -155,9 +151,10 @@ bool AnPlayerController :: InputKey ( FKey Key, EInputEvent EventType,
 	return APlayerController::InputKey ( Key, EventType, AmountDepressed, bGamePad );
 	}	// InputKey
 
-void AnPlayerController :: onButton (	UnElement *pElem, 
-														const WCHAR *wName,
-														const WCHAR *wState )
+/*
+void AnPlayerController :: onButton (	nElement *pElem, 
+													const WCHAR *wName,
+													const WCHAR *wState )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -174,19 +171,19 @@ void AnPlayerController :: onButton (	UnElement *pElem,
 	adtString	strLoc;
 
 	// Full location of element
-	CCLTRY ( adtValue::copy ( pElem->pParent->pRenLoc->strLocRen, strLoc ) );
-	CCLTRY ( strLoc.append ( pElem->pParent->strLoc ) );
+	CCLTRY ( adtValue::copy ( pElem->pRenLoc->strLocRen, strLoc ) );
+	CCLTRY ( strLoc.append ( pElem->strLoc ) );
 	CCLTRY ( pDctBt->store ( adtString(L"Location"), strLoc ) );
 
 	// Parent (group) location
-	UnElement *pParent = 
-			(pElem->pParent != NULL && pElem->pParent->pRoot != NULL) ?
-			Cast<UnElement> ( pElem->pParent->pRoot->GetAttachParent() ) : NULL;
+	nElement *pParent = 
+			(pElem->pOuter != NULL) ?
+			Cast<nElement> ( pElem->pOuter->GetAttachParent() ) : NULL;
 	if (hr == S_OK && pParent != NULL)
 		{
 		// Full location of element
-		CCLTRY ( adtValue::copy ( pParent->pParent->pRenLoc->strLocRen, strLoc ) );
-		CCLTRY ( strLoc.append ( pParent->pParent->strLoc ) );
+		CCLTRY ( adtValue::copy ( pParent->pRenLoc->strLocRen, strLoc ) );
+		CCLTRY ( strLoc.append ( pParent->strLoc ) );
 		CCLTRY ( pDctBt->store ( adtString(L"LocationParent"), strLoc ) );
 		}	// if
 
@@ -202,7 +199,7 @@ void AnPlayerController :: onButton (	UnElement *pElem,
 	CCLTRY ( pRen->addStore ( strLoc, adtIUnknown(pDctBt) ) );
 	}	// onButton
 
-void AnPlayerController::onClick( UnElement *pElem )
+void AnPlayerController::onClick( nElement *pElem )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -213,19 +210,17 @@ void AnPlayerController::onClick( UnElement *pElem )
 	//		-	pElem is the element component
 	//
 	////////////////////////////////////////////////////////////////////////
-/*
 	// Assign element.
 	pElemClk = pElem;
 	bElemClk = true;
 
 	// Send event to element
 	dbgprintf ( L"AnPlayerController::onClick:pElem %p\r\n", pElem );
-*/
 	}	// onClick
 
-void AnPlayerController :: onRay  ( UnElement *pElem, 
-													const FVector &vLoc, 
-													const FVector &vDir )
+void AnPlayerController :: onRay  ( nElement *pElem, 
+												const FVector &vLoc, 
+												const FVector &vDir )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -242,19 +237,19 @@ void AnPlayerController :: onRay  ( UnElement *pElem,
 	adtString	strLoc;
 
 	// Full location of element
-	CCLTRY ( adtValue::copy ( pElem->pParent->pRenLoc->strLocRen, strLoc ) );
-	CCLTRY ( strLoc.append ( pElem->pParent->strLoc ) );
+	CCLTRY ( adtValue::copy ( pElem->pRenLoc->strLocRen, strLoc ) );
+	CCLTRY ( strLoc.append ( pElem->strLoc ) );
 	CCLTRY ( pDctRy->store ( adtString(L"Location"), strLoc ) );
 
 	// Parent (group) location
-	UnElement *pParent = 
-			(pElem->pParent != NULL && pElem->pParent->pRoot != NULL) ?
-			Cast<UnElement> ( pElem->pParent->pRoot->GetAttachParent() ) : NULL;
+	nElement *pParent = 
+			(pElem != NULL && pElem->pOuter != NULL) ?
+			Cast<nElement> ( pElem->pOuter->GetAttachParent() ) : NULL;
 	if (hr == S_OK && pParent != NULL)
 		{
 		// Full location of element
-		CCLTRY ( adtValue::copy ( pParent->pParent->pRenLoc->strLocRen, strLoc ) );
-		CCLTRY ( strLoc.append ( pParent->pParent->strLoc ) );
+		CCLTRY ( adtValue::copy ( pParent->pRenLoc->strLocRen, strLoc ) );
+		CCLTRY ( strLoc.append ( pParent->strLoc ) );
 		CCLTRY ( pDctBt->store ( adtString(L"LocationParent"), strLoc ) );
 		}	// if
 
@@ -273,6 +268,7 @@ void AnPlayerController :: onRay  ( UnElement *pElem,
 	// Send
 	CCLTRY ( pRen->addStore ( strLoc, adtIUnknown(pDctRy) ) );
 	}	// onRay
+*/
 
 void AnPlayerController :: SetupInputComponent ( void )
 	{
@@ -347,7 +343,7 @@ pawn->SetActorLocation(FVector(0,0,0),true);
 //		this->SetActorLocation ( FVector(0,0,0), true, &r );
 */
 		}	// if
-
+/*
 	// Element capture
 	if (	pElemCap == NULL	&& 
 			!bElemCap			&&
@@ -368,11 +364,11 @@ pawn->SetActorLocation(FVector(0,0,0),true);
 			pcAt = hr.GetComponent();
 
 			// Check if parent is an nSpace element
-			pElemCap = Cast<UnElement> ( pcAt->GetAttachParent() );
+			pElemCap = Cast<nElement> ( pcAt->GetAttachParent() );
 
 			// To handle two levels deep
 			if (pElemCap == NULL && pcAt->GetAttachParent() != NULL)
-				pElemCap = Cast<UnElement> ( pcAt->GetAttachParent()->GetAttachParent() );
+				pElemCap = Cast<nElement> ( pcAt->GetAttachParent()->GetAttachParent() );
 
 			// Initial capture point in world coordinates
 			vElemAt	= hr.Location;
@@ -392,7 +388,7 @@ pawn->SetActorLocation(FVector(0,0,0),true);
 			if (pElemCap != NULL)
 				{
 				// Compute input location
-				tElemCap	= pElemCap->GetComponentToWorld();
+				tElemCap	= pElemCap->pOuter->GetComponentToWorld();
 //				tE			= pcAt->GetComponentToWorld();
 				vElemAt	= tElemCap.InverseTransformPosition ( vElemAt );
 				vElemDr	= tElemCap.InverseTransformVector ( vElemDr );
@@ -476,7 +472,7 @@ pawn->SetActorLocation(FVector(0,0,0),true);
 			}	// if
 
 		}	// else if
-
+*/
 	}	// Tick
 
 

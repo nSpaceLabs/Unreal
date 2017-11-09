@@ -7,7 +7,7 @@ static ConstructorHelpers::FObjectFinder<UObject> *FCyl	= NULL;
 static ConstructorHelpers::FObjectFinder<UObject> *FCon	= NULL;
 static ConstructorHelpers::FObjectFinder<UObject> *FMat	= NULL;
 
-UnShape::UnShape()
+AnShape::AnShape()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -40,9 +40,9 @@ UnShape::UnShape()
 		FMat = new ConstructorHelpers::FObjectFinder<UObject> 
 					( TEXT("/Engine/BasicShapes/BasicShapeMaterial") );
 
-	}	// UnShape
+	}	// AnShape
 
-void UnShape :: InitializeComponent ( void )
+void AnShape :: BeginPlay ( void )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -52,20 +52,18 @@ void UnShape :: InitializeComponent ( void )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnShape::InitializeComponent"));
-	if (pParent != NULL)
-		{
-		UE_LOG(LogTemp, Warning, TEXT("pRoot %p\r\n"), pParent->pRoot );
-		}	// if
+	UE_LOG(LogTemp, Warning, TEXT("AnShape::BeginPlay"));
 
 	// Base behaviour
-	UnElement::InitializeComponent();
+	AnElement::BeginPlay();
 
 	// Create static mesh component to use for shape
 	pcShp					= NewObject<UStaticMeshComponent>
 								(this,UStaticMeshComponent::StaticClass());
-	pcShp->bVisible	= false;
-	pcShp->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
+	pcShp->bVisible	= true;
+
+	SetRootComponent(pcShp);
+//	pcShp->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
 
 	// Testing
 	pcShp->SetMobility(EComponentMobility::Movable);
@@ -88,9 +86,11 @@ void UnShape :: InitializeComponent ( void )
 
 	// Place component in world
 	pcShp->RegisterComponent();
-	}	// InitializeComponent
+//pcShp->SetVisibility(true);
 
-void UnShape :: UninitializeComponent ( void )
+	}	// BeginPlay
+
+void AnShape :: EndPlay ( const EEndPlayReason::Type rsn )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -100,23 +100,63 @@ void UnShape :: UninitializeComponent ( void )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("UnShape::UninitializeComponent"));
-
-	// Shape
-	if (pcShp != NULL)
-		{
-//		pcShp->DetachFromParent();
-//		pcShp->UninitializeComponent();
-		pcShp->bVisible		= false;
-		pcShp->bHiddenInGame	= true;
-		pcShp						= NULL;
-		}	// if
+	UE_LOG(LogTemp, Warning, TEXT("AnShape::EndPlay"));
 
 	// Base behaviour
-	UnElement::UninitializeComponent();
-	}	// UninitializeComponent
+	AnElement::EndPlay(rsn);
+	}	// EndPlay
 
-bool UnShape :: mainTick ( float fD )
+bool AnShape :: onValue (	const WCHAR *pwRoot, 
+									const WCHAR *pwLoc,
+									const ADTVALUE &v )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	OVERLOAD
+	//	FROM		nSpaceClientCB
+	//
+	//	PURPOSE
+	//		-	Called when a listened location receives a value.
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	v is the value
+	//
+	//	RETURN VALUE
+	//		true if there is main game loop to be scheduled.
+	//
+	////////////////////////////////////////////////////////////////////////
+	bool	bSch	= false;
+
+	// Debug
+//	UE_LOG(LogTemp, Log, TEXT("AnShape::onValue:%s:%s"), pwRoot, pwLoc );
+
+	// Base behaviour
+	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+
+	// Color
+	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
+		{
+		// Color update
+		iColor= adtInt(v);
+		bColor= true;
+		bSch	= true;
+		}	// if
+
+	// Name
+	else if (!WCASECMP(pwLoc,L"Name/OnFire/Value"))
+		{
+		// Shape name update
+		adtValue::copy ( adtString(v), strName );
+ 		strName.at();
+		bSch	= true;
+		}	// if
+
+	return bSch;
+	}	// onValue
+
+bool AnShape :: tickMain ( float fD )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -133,15 +173,8 @@ bool UnShape :: mainTick ( float fD )
 	HRESULT	hr		= S_OK;
 	bool		bWrk = false;
 
-	// Debug
-//	if (fTt.X > 0 || fTt.Y > 0 || fTt.Z > 0)
-//		{
-//		dbgprintf ( L"UnShape::mainTick:Translate:%g,%g,%g\r\n",
-//						fTf.X, fTf.Y, fTf.Z );
-//		}	// if
-
 	// Default behaviour
-	bWrk = UnElement::mainTick(fD);
+	bWrk = AnElement::tickMain(fD);
 
 	// Color
 	if (bColor)
@@ -161,12 +194,7 @@ bool UnShape :: mainTick ( float fD )
 	if (strName[0] != '\0')
 		{
 		UStaticMesh	*pMesh	= NULL;
-		dbgprintf ( L"UnShape::mainTick:Shape:%s\r\n", (LPCWSTR)strName );
-
-		if (pParent != NULL)
-			{
-			UE_LOG(LogTemp, Warning, TEXT("pRoot %p\r\n"), pParent->pRoot );
-			}	// if
+		dbgprintf ( L"AnShape::mainTick:Shape:%s\r\n", (LPCWSTR)strName );
 
 		// Previous shape
 //		if (pcShp != NULL)
@@ -196,7 +224,7 @@ bool UnShape :: mainTick ( float fD )
 
 		// Success ?
 		if (pMesh == NULL)
-			dbgprintf ( L"UnShape::mainTick:Failed to create mesh for %s\r\n", (LPCWSTR)strName );
+			dbgprintf ( L"AnShape::mainTick:Failed to create mesh for %s\r\n", (LPCWSTR)strName );
 
 		// Assign the loaded mesh
 		if (pMesh != NULL)
@@ -230,81 +258,20 @@ bool UnShape :: mainTick ( float fD )
 
 			// Initial scaling
 			pcShp->SetRelativeScale3D(fSclLcl);
+
+			// Root transform was updated
+			rootUpdate();
 			}	// if
 
 		// Testing
 //		pcShp->SetEnableGravity(false);
 //		pcShp->SetSimulatePhysics(true);
+//		pcShp->SetVisibility(true,true);
 
 		// Done
 		strName.at(0)	= '\0';
 		}	// if
 
 	return bWrk;
-	}	// mainTick
+	}	// tickMain
 
-bool UnShape :: onReceive (	nElement *pElem,
-											const WCHAR *pwRoot, 
-											const WCHAR *pwLoc,
-											const ADTVALUE &v )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
-	//
-	//	PURPOSE
-	//		-	Called when a listened location receives a value.
-	//
-	//	PARAMETERS
-	//		-	pElem is the nSpace element
-	//		-	pwRoot is the path to the listened location
-	//		-	pwLoc is the location relative to the root for the value
-	//		-	v is the value
-	//
-	//	RETURN VALUE
-	//		true if there is main game loop to be scheduled.
-	//
-	////////////////////////////////////////////////////////////////////////
-	bool	bSch	= false;
-
-	// Base behaviour
-	bSch = UnElement::onReceive(pElem,pwRoot,pwLoc,v);
-
-	// Color
-	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
-		{
-		// Color update
-		iColor= adtInt(v);
-		bColor= true;
-		bSch	= true;
-		}	// if
-
-	// Name
-	else if (!WCASECMP(pwLoc,L"Name/OnFire/Value"))
-		{
-		// Shape name update
-		adtValue::copy ( adtString(v), strName );
- 		strName.at();
-		bSch	= true;
-		}	// if
-
-	return bSch;
-	}	// onReceive
-
-/*
-// Called when the game starts or when spawned
-void UnShape::BeginPlay()
-{
-	Super::BeginPlay();
-	
-}
-
-// Called every frame
-void UnShape::Tick( float DeltaTime )
-{
-	Super::Tick( DeltaTime );
-
-}
-
-*/
