@@ -48,8 +48,7 @@ class nElementRef :
 UCLASS()
 class AnElement : 
 	public AActor,											// Base class
-	public nSpaceClientCB,								// Callback
-	public InTick											// Callback
+	public nValues											// Callback
 	{
 	GENERATED_BODY()
 
@@ -62,94 +61,24 @@ class AnElement :
 	adtString	strLoc;									// Location of element state
 	adtString	strLstn;									// Listen location
 	bool			bRun;										// Element running
-	int			iState;									// Element state
 
 	// State
-	FVector		fTi,fTf,fS,fR;							// Target transformations
-	bool			bTrans;									// Translation updated
+	FVector		fT,fS,fR;								// Target transformations
 	FVector		fTt;										// Time for translation
 	FVector		fSclLcl;									// Local scaling (if needed)
-	bool			bScl;										// Scaling update
 	FVector		fRotNow;									// Current rotation
-	bool			bRot[3];									// Rotation update
-	int			iVisible;								// Visible update
 	int			iColor;									// 32-bit color
-	bool			bColor;									// Color update required
 
 	// Utilities
 	void	init			( AnLoc *, const WCHAR * );// Initialize state
 	void	rootUpdate	( void );						// Root component has changed
 
-	// 'AnElement' members
-	virtual bool onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
-
 	// 'AActor' members
 	virtual void BeginPlay	() override;
 	virtual void EndPlay		( const EEndPlayReason::Type ) override;
+	virtual void Tick			( float DeltaSeconds) override;
 
-	// 'InTick' memebers
-	virtual bool tickMain	( float );				// Main thread ticking
-	virtual bool tickWork	( void );				// Worker thread ticking
-
-	// 'nSpaceClientCB' members
-	STDMETHOD(onReceive)	( const WCHAR *, const WCHAR *, const ADTVALUE & );
-
+	// 'nValues' members
+	virtual void onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 	};
 
-/*
-// Definitions
-#define	SZ_TIME_MOVE			1.0					// Seconds to move
-
-
-// Forward decs.
-class AnActor;
-
-//
-// Class - nElement.  Base class for nSpace visual elements.
-//
-
-class nElement : 
-	public CCLObject,										// Base class
-	public nSpaceClientCB,								// Callback
-	public InTick											// Callback
-	{
-	public:	
-	nElement	( void );									// Constructor
-
-	// Run-time data
-	AnActor		*pRen;									// Master render object
-	AnLoc			*pRenLoc;								// Render location
-	adtString	strLoc,strDef;							// Namespace location and definition
-	bool			bRun;										// Element running
-	int			iRoot;									// Index for root elements
-	int			iState;									// Element state
-
-	// Component
-	AActor		*pOuter;									// Outer actor dervied from this element
-	FVector		fTi,fTf,fS,fR;							// Target transformations
-	FVector		fTt;										// Time for translation
-	FVector		fSclLcl;									// Local scaling (if needed)
-	FVector		fRotNow;									// Current rotation
-	bool			bRot[3];									// Rotation update
-	int			iVisible;								// Visible update
-	int			iColor;									// 32-bit color
-	bool			bColor;									// Color update required
-
-	// Utilities
-	void init		( AnLoc *, const ADTVALUE & );// Initialize state
-
-
-
-	// Custom events
-	virtual void	onButton		( IDictionary *, const WCHAR *, const WCHAR * );
-	virtual void	onRay			( IDictionary *, const FVector &, const FVector & );
-
-
-	// CCL
-	CCL_OBJECT_BEGIN_INT(nElement)
-	CCL_OBJECT_END()
-	virtual HRESULT	construct	( void );		// Construct object
-	virtual void		destruct		( void );		// Destruct object
-	
-	};
-*/

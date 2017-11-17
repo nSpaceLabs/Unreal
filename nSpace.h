@@ -39,14 +39,41 @@
 // Forward decs.
 class AnSpacet;
 
+// Operations for async client
+#define	OP_LOAD						1
+#define	OP_STORE						2
+#define	OP_LISTEN					3
+#define	OP_UNLISTEN					4
+
 //
-// Interface - InTick.  "Tickable" callback for processing from different threads.
+// Class - nValues.  Base class to handle reception of values on one thread (worker)
+//		and distribution of values on another (game loop).
 //
 
-interface InTick 
+class nValues :
+	public nSpaceClientCB								// Callback function
 	{
-	virtual bool tickMain ( float )	= 0;			// Tick from main game loop
-	virtual bool tickWork ( void )	= 0;			// Tick from worker thread
+	public :
+	nValues ( void );										// Constructor
+	virtual ~nValues ( void );							// Destructor
+
+
+	// Utilities
+	HRESULT dequeue ( void );
+	HRESULT enqueue ( const WCHAR *, const WCHAR *, const ADTVALUE & );
+
+	// 'nValues' members
+	virtual void onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
+
+	// 'nSpaceClientCB' members
+	STDMETHOD(onReceive)	(const WCHAR *, const WCHAR *, const ADTVALUE &);
+
+	private :
+
+	// Run-time data
+	IList	*pQv;												// Value queue
+	IIt	*pQvIt;											// Value queue iterator
+
 	};
 
 //
@@ -55,7 +82,9 @@ interface InTick
 //
 
 UCLASS()
-class AnSpace : public AActor
+class AnSpace : 
+	public AActor,
+	public nValues
 	{
 	GENERATED_BODY()
 	
@@ -68,12 +97,9 @@ class AnSpace : public AActor
 	// Run-time data
 	nSpaceClient		*pCli;							// nSpace client
 	IDictionary			*pDctLoc;						// Location handler dictionary
-	bool					bNewLoc;							// A new render location has been added
 	adtString			strRefActor;					// References
 	adtString			strRenLoc;						// Render state location
 	sysCS					csRen;							// Global render mutex
-	adtString			strLevel;						// Level requests
-	bool					bLevel;							// Level change ?
 	bool					bCamera[4];						// Camera coordinate change
 	float					fCamera[4];						// Camera coordinates
 
@@ -84,16 +110,9 @@ class AnSpace : public AActor
 	IIt					*pWrkIt;							// Worker queue iterator
 	sysEvent				evWork;							// Worker thread event
 	bool					bWork;							// True to keep working
-	IList					*pStQ;							// Store queue
-	IIt					*pStIt;							// Store queue iterator
-
-	// Game loop thread
-	IList					*pMnQ;							// Main queue
-	IIt					*pMnIt;							// Main queue iterator
 
 	// Utilities
-	HRESULT addMain	( InTick * );
-	HRESULT addWork	( InTick * );
+	HRESULT addListen	( const WCHAR *, nSpaceClientCB *, const WCHAR * = NULL );
 	HRESULT addStore	( const WCHAR *, const ADTVALUE &, const WCHAR * = NULL );
 
 	// 'AActor' memebers
@@ -101,9 +120,8 @@ class AnSpace : public AActor
 	virtual void EndPlay		( const EEndPlayReason::Type) override;
 	virtual void Tick			( float DeltaSeconds) override;
 
-	// Internal utilities
-	HRESULT onValue (const WCHAR *, const WCHAR *, const ADTVALUE &);
-
+	// 'nValues' members
+	virtual void onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 	};
 
 //
@@ -113,17 +131,13 @@ class AnSpace : public AActor
 
 class AnSpacet : 
 	public CCLObject,										// Base class
-	public ITickable,										// Interface
-	public nSpaceClientCB								// Callback function
+	public ITickable										// Interface
 	{
 	public :
 	AnSpacet ( AnSpace * );								// Constructor
 
 	// Run-time datas
 	AnSpace			*pThis;								// Parent object
-
-	// 'nSpaceClientCB' members
-	STDMETHOD(onReceive)	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 
 	// 'ITickable' members
 	STDMETHOD(tick)		( void );

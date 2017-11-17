@@ -27,24 +27,17 @@ AnSpace::AnSpace()
 	// Setup
 	pCli			= NULL;
 	pDctLoc		= NULL;
-	bNewLoc		= false;
 
 	// String references
 	strRefActor = L"Actor";
 //	strRenLoc	= L"/State/Interface/Dict/RenderList/Dict/";
 	strRenLoc	= L"/State/Render/3D/State/Default/";
-	strLevel		= L"";
-	bLevel		= false;
 
 	// Worker thread
 	pThrd			= NULL;
 	pTick			= NULL;
-	pMnQ			= NULL;
-	pMnIt			= NULL;
 	pWrkQ			= NULL;
 	pWrkIt		= NULL;
-	pStQ			= NULL;
-	pStIt			= NULL;
 	evWork.init();
 
 	// Set this actor to call Tick() every frame.  
@@ -63,10 +56,6 @@ AnSpace::~AnSpace()
 	////////////////////////////////////////////////////////////////////////
 	_RELEASE(pTick);
 	_RELEASE(pThrd);
-	_RELEASE(pMnIt);
-	_RELEASE(pMnQ);
-	_RELEASE(pStIt);
-	_RELEASE(pStQ);
 	_RELEASE(pWrkIt);
 	_RELEASE(pWrkQ);
 	_RELEASE(pDctLoc);
@@ -78,31 +67,49 @@ AnSpace::~AnSpace()
 
 	}	// ~AnSpace
 
-HRESULT AnSpace :: addMain ( InTick *pTick )
+HRESULT AnSpace :: addListen ( const WCHAR *pwLoc, nSpaceClientCB *pCB,
+											const WCHAR *pwLocRen )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Add object to main game loop for ticking.
+	//		-	Add a 'listen' request to work queue.
 	//
 	//	PARAMETERS
-	//		-	pTick is the tickable object.
+	//		-	pwLoc is the listen location
+	//		-	pCB is the callback object
+	//		-	pwLocRen is the root render location
 	//
 	//	RETURN VALUE
 	//		S_OK if successful
 	//
 	////////////////////////////////////////////////////////////////////////
-	lprintf ( LOG_INFO, L"pTick %p lTick %ld", pTick, (U64)pTick );
+	HRESULT		hr = S_OK;
+	adtString	strLoc(pwLoc);
 
 	// State check
-	if (!bWork || pMnQ == NULL)
+	if (!bWork || pWrkQ == NULL)
 		return S_OK;
 
-	return pMnQ->write ( adtLong((U64)pTick) );
-	}	// addMain
+	// State check
+	CCLTRYE ( strLoc.length() > 0, E_INVALIDARG );
+
+	// Prepend the render location for relative locations
+	if (hr == S_OK && *pwLoc != '/' && pwLocRen != NULL)
+		hr = strLoc.prepend ( pwLocRen );
+
+	// Add to queue and signal thread
+	dbgprintf ( L"AnSpace::addStore:%s\r\n", (LPCWSTR)strLoc );
+	CCLTRY ( pWrkQ->write ( adtInt(OP_LISTEN) ) );
+	CCLTRY ( pWrkQ->write ( strLoc ) );
+	CCLTRY ( pWrkQ->write ( adtLong((U64)pCB) ) );
+	CCLOK  ( evWork.signal(); )
+
+	return hr;
+	}	// addListen
 
 HRESULT AnSpace :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v, 
-													const WCHAR *pwLocRen )
+											const WCHAR *pwLocRen )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -122,7 +129,7 @@ HRESULT AnSpace :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v,
 	adtString	strLoc(pwLoc);
 
 	// State check
-	if (!bWork || pStQ == NULL)
+	if (!bWork || pWrkQ == NULL)
 		return S_OK;
 
 	// State check
@@ -134,39 +141,13 @@ HRESULT AnSpace :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v,
 
 	// Add to queue and signal thread
 	dbgprintf ( L"AnSpace::addStore:%s\r\n", (LPCWSTR)strLoc );
-	CCLTRY ( pStQ->write ( strLoc ) );
-	CCLTRY ( pStQ->write ( v ) );
+	CCLTRY ( pWrkQ->write ( adtInt(OP_STORE) ) );
+	CCLTRY ( pWrkQ->write ( strLoc ) );
+	CCLTRY ( pWrkQ->write ( v ) );
 	CCLOK  ( evWork.signal(); )
 
 	return hr;
 	}	// addStore
-
-HRESULT AnSpace :: addWork ( InTick *pTick )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Add object to worker thread for ticking.
-	//
-	//	PARAMETERS
-	//		-	pTick is the tickable object.
-	//
-	//	RETURN VALUE
-	//		S_OK if successful
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr = S_OK;
-
-	// State check
-	if (!bWork || pWrkQ == NULL)
-		return S_OK;
-
-	// Add to queue and signal thread
-	CCLTRY ( pWrkQ->write ( adtLong((U64)pTick) ) );
-	CCLOK  ( evWork.signal(); )
-
-	return hr;
-	}	// addWork
 
 void AnSpace::BeginPlay()
 	{
@@ -231,9 +212,9 @@ void AnSpace::EndPlay(const EEndPlayReason::Type rsn )
 	Super::EndPlay(rsn);
 	}	// EndPlay
 
-HRESULT AnSpace :: onValue (	const WCHAR *pwRoot, 
-										const WCHAR *pwLoc,
-										const ADTVALUE &vV )
+void AnSpace :: onValue (	const WCHAR *pwRoot, 
+									const WCHAR *pwLoc,
+									const ADTVALUE &vV )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -246,11 +227,9 @@ HRESULT AnSpace :: onValue (	const WCHAR *pwRoot,
 	//		-	pwLoc is the location relative to the root for the value
 	//		-	vV contains the value
 	//
-	//	RETURN VALUE
-	//		S_OK if successful
-	//
 	////////////////////////////////////////////////////////////////////////
-	HRESULT		hr			= S_OK;
+	HRESULT		hr				= S_OK;
+	bool			bCamera[4]	= { false, false, false, false };
 	adtInt		iIdx;
 //	int			idx;
 
@@ -341,15 +320,18 @@ HRESULT AnSpace :: onValue (	const WCHAR *pwRoot,
 		// Need a new location handler at index ?
 		if (hr == S_OK && pDctLoc->load ( iIdx, vL ) != S_OK)
 			{
-			// Update descriptor with location and initialization request
-			CCLTRY ( pDct->store ( adtString(L"Initialize"), adtBool(true) ) );
-			CCLTRY ( pDct->store ( adtString(L"Location"), strL ) );
+			AnLoc			*pLoc = NULL;
+			adtValue		vL;
+			adtIUnknown	unkV;
 
 			// Store as descriptor for index
 			CCLTRY ( pDctLoc->store ( iIdx, adtIUnknown(pDct) ) );
 
-			// Let game loop know to look for new locations
-			CCLOK  ( bNewLoc = true; )
+			// Spawn an nSpace render location actor
+			CCLTRYE ( (pLoc = Cast<AnLoc>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+							this,AnLoc::StaticClass(),FTransform()))) != NULL, E_UNEXPECTED );
+			CCLOK ( pLoc->init(this,strL,iIdx); )
+			CCLOK ( UGameplayStatics::FinishSpawningActor(pLoc,FTransform()); )
 			}	// if
 
 		// Clean up
@@ -359,124 +341,8 @@ HRESULT AnSpace :: onValue (	const WCHAR *pwRoot,
 	// Level selection
 	else if (!WCASECMP(pwLoc,L"Level/Element/Default/OnFire/Value"))
 		{
-		// Cache level selection for work in the game loop
-		adtValue::toString(vV,strLevel);
-		bLevel = true;
-		}	// else if
-
-	// Camera changes
-	else if (	((bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) == true) ||
-					((bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) == true) ||
-					((bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) == true) ||
-					((bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) == true) )
-		{
-		// Cache new value
-		if			(bCamera[0])	fCamera[0] = adtFloat(vV);
-		else if	(bCamera[1])	fCamera[1] = adtFloat(vV);
-		else if	(bCamera[2])	fCamera[2] = adtFloat(vV);
-		else if	(bCamera[3])	fCamera[3] = adtFloat(vV);
-		}	// else if
-
-	return hr;
-	}	// onValue
-
-void AnSpace::Tick( float DeltaTime )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Called every frame
-	//
-	//	PARAMETERS
-	//		-	DeltaTime is amount of elapased time.
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr = S_OK;
-
-	// Base behaviour
-	Super::Tick( DeltaTime );
-
-	// Execute any scheduled work
-	if (hr == S_OK && pMnQ != NULL && pMnQ->isEmpty() != S_OK)
-		{
-		U32			sz	= 0;
-		adtValue		vV;
-
-		// One pass through
-		CCLTRY ( pMnQ->size ( &sz ) );
-		for (U32 i = 0;i < sz;++i)
-			{
-			// Object for ticking
-			CCLTRY ( pMnIt->read ( vV ) );
-
-			// Tick work
-			if (hr == S_OK)
-				{
-				// Requeue if still needs more work
-				if (((InTick *)(vV.vlong))->tickMain(DeltaTime))
-					pMnQ->write ( vV );
-				}	// if
-
-			// Move to next vlaue
-			pMnIt->next();
-			}	// for
-
-		}	// if
-
-	// Has at least one render location been added ?
-	if (bNewLoc)
-		{
-		IIt			*pIt	= NULL;
-		adtValue		vL;
-		adtIUnknown	unkV;
-
-		// No new locations
-		bNewLoc = false;
-
-		// Spawn a render location actor for every uninitialized location
-		CCLTRY(pDctLoc->keys(&pIt));
-		while (hr == S_OK && pIt->read(vL) == S_OK)
-			{
-			IDictionary *pDct	= NULL;
-			adtInt		iIdx(vL);
-
-			// Check if index needs a location handler initialized
-			if (	pDctLoc->load ( iIdx, vL ) == S_OK			&&				// Index present ?
-					(IUnknown *)(NULL) != (unkV=vL)				&&				// Valid descriptor ?
-					_QI(unkV,IID_IDictionary,&pDct) == S_OK	&&				// Dictionary ?
-					pDct->load(adtString(L"Initialize"),vL) == S_OK)		// Need to be initialized ?
-				{
-				AnLoc *pLoc = NULL;
-
-				// Location of visual
-				CCLTRY ( pDct->load ( adtString(L"Location"), vL ) );
-
-				// Spawn an nSpace render location actor
-				CCLTRYE ( (pLoc = Cast<AnLoc>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
-								this,AnLoc::StaticClass(),FTransform()))) != NULL, E_UNEXPECTED );
-				CCLOK ( pLoc->init(this,adtString(vL),iIdx); )
-				CCLOK ( UGameplayStatics::FinishSpawningActor(pLoc,FTransform()); )
-
-				// Initialized
-				pDct->remove(adtString(L"Initialize"));
-				}	// if
-
-			// Clean up
-			_RELEASE(pDct);
-			pIt->next();
-			}	// while
-
-		// Clean up
-		_RELEASE(pIt);
-
-		// No need to error out of whole loop
-		hr = S_OK;
-		}	// while
-
-	// Level change ?
-	if (bLevel)
-		{
 		char	*pcLevel	= NULL;
+		adtString	strLevel(vV);
 
 		// Convert to ASCII for API
 		if (strLevel.length() > 0 && strLevel.toAscii(&pcLevel) == S_OK)
@@ -495,55 +361,88 @@ void AnSpace::Tick( float DeltaTime )
 			_FREETASKMEM(pcLevel);
 			}	// if
 
-		// Request complete
-		bLevel = false;
-		}	// if
+		}	// else if
 
-	// Camera update ?  NOTE: Currently using the knowledge that all
-	// four coordinates are updated at the same time, change this ?
-//	else if (bCamera[0] || bCamera[1] || bCamera[2] || bCamera[3])
-	else if (bCamera[3])
+	// Camera changes
+	else if (	((bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) == true) ||
+					((bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) == true) ||
+					((bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) == true) ||
+					((bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) == true) )
 		{
-		static bool			bFirst = true;
-		static FRotator	rCtlr0;
-		static FRotator	rCamera0;
+		// Cache new value
+		if			(bCamera[0])	fCamera[0] = adtFloat(vV);
+		else if	(bCamera[1])	fCamera[1] = adtFloat(vV);
+		else if	(bCamera[2])	fCamera[2] = adtFloat(vV);
+		else if	(bCamera[3])	fCamera[3] = adtFloat(vV);
 
-		// Controller for the game
-		APlayerController
-		*pCtlr = UGameplayStatics::GetPlayerController(GetWorld(),0);
-
-		// Update orientation
-		if (pCtlr != NULL)
+		// Camera update ?  NOTE: Currently using the knowledge that all
+		// four coordinates are updated at the same time, change this...
+		if (bCamera[3])
 			{
-			FRotator 
-			rCamera = FRotator(FQuat(fCamera[0],fCamera[1],fCamera[2],fCamera[3]));
+			static bool			bFirst = true;
+			static FRotator	rCtlr0;
+			static FRotator	rCamera0;
 
-			// Use start orientation as a baseline
-			if (bFirst)
+			// Controller for the game
+			APlayerController
+			*pCtlr = UGameplayStatics::GetPlayerController(GetWorld(),0);
+
+			// Update orientation
+			if (pCtlr != NULL)
 				{
-				// Store initial position of player
-				rCtlr0	= pCtlr->GetControlRotation();
+				FRotator 
+				rCamera = FRotator(FQuat(fCamera[0],fCamera[1],fCamera[2],fCamera[3]));
 
-				// Store initial offset for camera
-				rCamera0	= rCamera;
+				// Use start orientation as a baseline
+				if (bFirst)
+					{
+					// Store initial position of player
+					rCtlr0	= pCtlr->GetControlRotation();
 
-				// Initial capture done
-				bFirst	= false;
+					// Store initial offset for camera
+					rCamera0	= rCamera;
+
+					// Initial capture done
+					bFirst	= false;
+					}	// if
+
+				// Offset of baseline
+				rCamera -= rCamera0;
+
+				// Compute new offset player controller
+				FRotator
+				rCtlr		= rCtlr0;
+				rCtlr		+= rCamera;
+
+				// New orientation
+				pCtlr->SetControlRotation(rCtlr);
 				}	// if
-
-			// Offset of baseline
-			rCamera -= rCamera0;
-
-			// Compute new offset player controller
-			FRotator
-			rCtlr		= rCtlr0;
-			rCtlr		+= rCamera;
-
-			// New orientation
-			pCtlr->SetControlRotation(rCtlr);
 			}	// if
 		}	// else if
 
+	}	// onValue
+
+void AnSpace :: Tick( float DeltaTime )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Called every frame
+	//
+	//	OVERLOAD FROM
+	//		AActor
+	//
+	//	PARAMETERS
+	//		-	DeltaTime is amount of elapased time.
+	//
+	////////////////////////////////////////////////////////////////////////
+	HRESULT	hr = S_OK;
+
+	// Base behaviour
+	Super::Tick( DeltaTime );
+
+	// Distribute received values
+	dequeue();
 	}	// Tick
 
 //
@@ -567,30 +466,6 @@ AnSpacet :: AnSpacet ( AnSpace *_pThis )
 	pThis	= _pThis;
 	}	// AnSpacet
 
-HRESULT AnSpacet :: onReceive (	const WCHAR *pwRoot, 
-											const WCHAR *pwLoc,
-											const ADTVALUE &v )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
-	//
-	//	PURPOSE
-	//		-	Called when a listened location receives a value.
-	//
-	//	PARAMETERS
-	//		-	pwRoot is the path to the listened location
-	//		-	pwLoc is the location relative to the root for the value
-	//		-	v is the value
-	//
-	//	RETURN VALUE
-	//		S_OK if successful
-	//
-	////////////////////////////////////////////////////////////////////////
-	return pThis->onValue ( pwRoot, pwLoc, v );
-	}	// onReceive
-
 HRESULT AnSpacet :: tick ( void )
 	{
 	////////////////////////////////////////////////////////////////////////
@@ -612,40 +487,51 @@ HRESULT AnSpacet :: tick ( void )
 
 	// Execute scheduled work	
 	while (	hr == S_OK		&& 
-				pThis->bWork && 
+				pThis->bWork	&& 
 				pThis->pWrkQ->isEmpty() != S_OK)
 		{
 		adtValue		vV;
+		adtInt		iOp;
+		adtString	strLoc;
 
-		// Object for ticking
+		// Op code
 		CCLTRY ( pThis->pWrkIt->read ( vV ) );
+		CCLOK  ( iOp = vV; )
+		CCLOK  ( pThis->pWrkIt->next(); )
 
-		// Tick work
-		CCLOK ( ((InTick *)(vV.vlong))->tickWork(); )
+		// Location
+		CCLTRY ( pThis->pWrkIt->read ( vV ) );
+		CCLOK  ( pThis->pWrkIt->next(); )
 
-		// Move to next vlaue
-		pThis->pWrkIt->next();
-		}	// while
-
-	// Execute scheduled stores
-	while (	hr == S_OK		&& 
-				pThis->bWork && 
-				pThis->pStQ->isEmpty() != S_OK)
-		{
-		adtValue		vLoc,vV;
-
-		// Load location and value
-		if (	pThis->pStIt->read ( vLoc ) == S_OK &&
-				adtValue::type(vLoc) == VTYPE_STR )
+		switch (iOp)
 			{
-			// Load value
-			pThis->pStIt->next();
-			if (pThis->pStIt->read ( vV ) == S_OK )
-				pThis->pCli->store ( vLoc.pstr, vV );
-			}	// if
+			case OP_STORE :
+				{
+				adtString strLoc(vV);
 
-		// Move to next vlaue
-		pThis->pStIt->next();
+				// Value to store
+				CCLTRY ( pThis->pWrkIt->read ( vV ) );
+				CCLOK  ( pThis->pWrkIt->next(); )
+
+				// Issue command
+				CCLOK ( pThis->pCli->store ( strLoc, vV ); )
+				}	// OP_STORE
+				break;
+
+			case OP_LISTEN :
+				{
+				adtString strLoc(vV);
+
+				// Callback to use
+				CCLTRY ( pThis->pWrkIt->read ( vV ) );
+				CCLOK  ( pThis->pWrkIt->next(); )
+
+				// Issue command
+				CCLOK ( pThis->pCli->listen ( strLoc, true, (nSpaceClientCB *)(U64)adtLong(vV)); )
+				}	// OP_STORE
+				break;
+			}	// switch
+
 		}	// while
 
 	// Keep running ?
@@ -701,17 +587,9 @@ HRESULT AnSpacet :: tickBegin ( void )
 	// Work queues
 	//
 
-	// Create queue for scheduling work from main game loop
-	CCLTRY ( COCREATE ( L"Adt.Queue", IID_IList, &pThis->pMnQ ) );
-	CCLTRY ( pThis->pMnQ->iterate ( &pThis->pMnIt ) );
-
 	// Create queue and event for scheduling work from worker thread
 	CCLTRY ( COCREATE ( L"Adt.Queue", IID_IList, &pThis->pWrkQ ) );
 	CCLTRY ( pThis->pWrkQ->iterate ( &pThis->pWrkIt ) );
-
-	// Create queue for scheduling stores from worker thread
-	CCLTRY ( COCREATE ( L"Adt.Queue", IID_IList, &pThis->pStQ ) );
-	CCLTRY ( pThis->pStQ->iterate ( &pThis->pStIt ) );
 
 	//
 	// Client
@@ -724,7 +602,7 @@ HRESULT AnSpacet :: tickBegin ( void )
 	CCLTRY(pThis->pCli->open(L"{ Namespace Default }", true, NULL));
 
 	// Listen to the default render locations which contains desired visuals to be rendered
-	CCLTRY ( pThis->pCli->listen ( pThis->strRenLoc, true, this ) );
+	CCLTRY ( pThis->pCli->listen ( pThis->strRenLoc, true, pThis ) );
 
 	// Debug
 //	UE_LOG(LogTemp, Warning, TEXT("AnSpace::tickBegin"));
@@ -756,48 +634,7 @@ HRESULT AnSpacet :: tickEnd ( void )
 	if (pThis->pCli != NULL)
 		pThis->pCli->listen ( pThis->strRenLoc, false );
 
-	// Shutdown root element render locations
-	if (pThis->pDctLoc != NULL && pThis->pDctLoc->iterate ( &pIt ) == S_OK)
-		{
-		adtValue		vN;
-/*
-		// Clear render locations
-		while (pIt->read ( vN ) == S_OK)
-			{
-			IDictionary		*pDct		= NULL;
-			nElement		*pElem	= NULL;
-			adtIUnknown		unkV;
-
-			// Obtain descriptor and element
-			if (	(IUnknown *)(NULL) != (unkV=vN)							&&
-					_QI(unkV,IID_IDictionary,&pDct) == S_OK				&&
-					pDct->load ( adtString(L"Element"), vN ) == S_OK	&&
-					(IUnknown *)(NULL) != (unkV=vN)							&&
-					(pElem	= (nElement *)(unkV.punk))->pRenLoc != NULL)
-				pElem->pRenLoc->setRoot(NULL);
-
-			// Next entry
-			_RELEASE(pDct);
-			pIt->next();
-			}	// while
-*/
-		// Clean up
-		_RELEASE(pIt);
-		}	// if
-
-	// Clear queues
-	if (pThis->pMnQ != NULL)
-		pThis->pMnQ->clear();
-	if (pThis->pWrkQ != NULL)
-		pThis->pWrkQ->clear();
-	if (pThis->pStQ != NULL)
-		pThis->pStQ->clear();
-
 	// Clean up
-	_RELEASE(pThis->pMnIt);
-	_RELEASE(pThis->pMnQ);
-	_RELEASE(pThis->pStIt);
-	_RELEASE(pThis->pStQ);
 	_RELEASE(pThis->pWrkIt);
 	_RELEASE(pThis->pWrkQ);
 
@@ -819,3 +656,143 @@ HRESULT AnSpacet :: tickEnd ( void )
 	return hr;
 	}	// tickEnd
 
+///////////
+// nValues
+///////////
+
+nValues :: nValues()
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Constructor for the object.
+	//
+	////////////////////////////////////////////////////////////////////////
+
+	// Setup
+	pQv	= NULL;
+	pQvIt	= NULL;
+
+	// Create value queue
+	if (COCREATE ( L"Adt.Queue", IID_IList, &pQv ) == S_OK)
+		pQv->iterate(&pQvIt);
+
+	}	// nValues
+
+nValues :: ~nValues()
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Constructor for the object.
+	//
+	////////////////////////////////////////////////////////////////////////
+	_RELEASE(pQvIt);
+	_RELEASE(pQv);
+	}	// ~nValues
+
+HRESULT nValues :: dequeue ( void )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Dequeue the queue values and send it through 'onValue'
+	//
+	//	RETURN VALUE
+	//		S_OK if there was a value, S_FALSE if not.
+	//
+	////////////////////////////////////////////////////////////////////////
+	HRESULT	hr = S_OK;
+	adtValue	vR,vL,vV;
+
+	// Any values ?
+	while (hr == S_OK && pQv->isEmpty() == S_FALSE)
+		{
+		// Next tuple
+		CCLTRY ( pQvIt->read ( vR ) );
+		CCLOK  ( pQvIt->next(); )
+		CCLTRY ( pQvIt->read ( vL ) );
+		CCLOK  ( pQvIt->next(); )
+		CCLTRY ( pQvIt->read ( vV ) );
+		CCLOK  ( pQvIt->next(); )
+
+		// Proces
+		onValue ( adtString(vR), adtString(vL), vV );
+		}	// while
+
+	return hr;
+	}	// dequeue
+
+HRESULT nValues :: enqueue ( const WCHAR *pwRoot, const WCHAR *pwLoc,
+										const ADTVALUE &v )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Add a values to the queue
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	v is the value
+	//
+	//	RETURN VALUE
+	//		S_OK if successful
+	//
+	////////////////////////////////////////////////////////////////////////
+	HRESULT	hr = S_OK;
+
+	// Add to queue
+	CCLTRY ( pQv->write ( adtString(pwRoot) ) );
+	CCLTRY ( pQv->write ( adtString(pwLoc) ) );
+	CCLTRY ( pQv->write ( v ) );
+
+	return S_OK;
+	}	// enqueue
+
+HRESULT nValues :: onReceive (	const WCHAR *pwRoot, 
+											const WCHAR *pwLoc,
+											const ADTVALUE &v )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	OVERLOAD
+	//	FROM		nSpaceClientCB
+	//
+	//	PURPOSE
+	//		-	Called when a listened location receives a value.
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	v is the value
+	//
+	//	RETURN VALUE
+	//		S_OK if successful
+	//
+	////////////////////////////////////////////////////////////////////////
+	UE_LOG(LogTemp, Warning, TEXT("nValues::onReceive"));
+
+	// Queue it for later distribution in game thread
+	return enqueue ( pwRoot, pwLoc, v );
+	}	// onReceive
+
+void nValues :: onValue (	const WCHAR *pwRoot, 
+									const WCHAR *pwLoc,
+									const ADTVALUE &vV )
+	{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//	PURPOSE
+	//		-	Process a received value.
+	//
+	//	PARAMETERS
+	//		-	pwRoot is the path to the listened location
+	//		-	pwLoc is the location relative to the root for the value
+	//		-	vV contains the value
+	//
+	//	RETURN VALUE
+	//		S_OK if successful
+	//
+	////////////////////////////////////////////////////////////////////////
+	}	// onValue

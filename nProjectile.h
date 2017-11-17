@@ -2,14 +2,15 @@
 
 #pragma once
 
+#include "GameFramework/Actor.h"
 #include "nElement.h"
-#include "nLight.generated.h"
+#include "nProjectile.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class AnLight : 
+class AnProjectile : 
 	public AnElement
 	{
 	GENERATED_BODY()
@@ -17,16 +18,15 @@ class AnLight :
 	public:	
 
 	// Sets default values for this actor's properties
-	AnLight();
+	AnProjectile();
 
 	// Run-time data
-	ULightComponent		*pcLight;					// Light component
-	adtFloat					fIntense;					// Intensity
+	adtFloat		fX,fY,fZ;								// Velocity
+	UProjectileMovementComponent
+					*pcProj;									// Game engine component
 
 	// 'AnElement' class memebers
 	virtual void	BeginPlay() override;
 	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
 	virtual void	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
-
-
 	};

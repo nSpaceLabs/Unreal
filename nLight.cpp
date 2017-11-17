@@ -11,10 +11,6 @@ AnLight::AnLight()
 
 	// Setup
 	pcLight		= NULL;
-	strType		= L"";
-	bType			= false;
-	fIntense		= 5000.0f;
-	bIntense		= false;
 	}	// AnLight
 
 void AnLight :: BeginPlay ( void )
@@ -56,7 +52,7 @@ void AnLight :: EndPlay ( const EEndPlayReason::Type rsn )
 	AnElement::EndPlay(rsn);
 	}	// EndPlay
 
-bool AnLight :: onValue (	const WCHAR *pwRoot, 
+void AnLight :: onValue (	const WCHAR *pwRoot, 
 									const WCHAR *pwLoc,
 									const ADTVALUE &v )
 	{
@@ -77,67 +73,15 @@ bool AnLight :: onValue (	const WCHAR *pwRoot,
 	//		true if there is main game loop to be scheduled.
 	//
 	////////////////////////////////////////////////////////////////////////
-	bool	bSch	= false;
-
+	
 	// Debug
 //	UE_LOG(LogTemp, Log, TEXT("AnLight::onValue:%s:%s"), pwRoot, pwLoc );
 
 	// Base behaviour
-	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+	AnElement::onValue(pwRoot,pwLoc,v);
 
 	// Color
 	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
-		{
-		// Color update
-		iColor= adtInt(v);
-		bColor= true;
-		bSch	= true;
-		}	// if
-
-	// Type
-	else if (!WCASECMP(pwLoc,L"Type/OnFire/Value"))
-		{
-		// Light type update
-		adtValue::copy ( adtString(v), strType );
- 		strType.at();
-		bType	= true;
-		bSch	= true;
-		}	// if
-
-	// Intensity
-	else if (!WCASECMP(pwLoc,L"Intensity/OnFire/Value"))
-		{
-		// Shape Type update
-		fIntense = adtFloat(v);
-		bIntense	= true;
-		bSch		= true;
-		}	// if
-
-	return bSch;
-	}	// onValue
-
-bool AnLight :: tickMain ( float fD )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Execute work for main game thread.
-	//
-	//	PARAMETERS
-	//		-	fD is the amount of elapsed time since last game loop tick.
-	//
-	//	RETURN VALUE
-	//		true if work is still needed
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr		= S_OK;
-	bool		bWrk = false;
-
-	// Default behaviour
-	bWrk = AnElement::tickMain(fD);
-
-	// Color
-	if (bColor)
 		{
 		FLinearColor	clr	(	((iColor>>16)&0xff)/255.0,
 										((iColor>>8)&0xff)/255.0,
@@ -147,21 +91,13 @@ bool AnLight :: tickMain ( float fD )
 		// Update
 		if (pcLight != NULL)
 			pcLight->SetLightColor(clr);
-		bColor = false;
 		}	// if
 
-	// Intensity
-	if (bIntense)
+	// Type
+	else if (!WCASECMP(pwLoc,L"Type/OnFire/Value"))
 		{
-		// Update
-		if (pcLight != NULL)
-			pcLight->SetIntensity(fIntense);
-		bIntense = false;
-		}	// if
+		adtString strType(v);
 
-	// Allow to change type on the fly ?
-	if (bType)
-		{
 		// Allow dynamic changes of light type ?
 		if (pcLight == NULL && strType.length() > 0)
 			{
@@ -173,12 +109,17 @@ bool AnLight :: tickMain ( float fD )
 			// Valid light type ?
 			if (pcLight != NULL)
 				{
+				FLinearColor	clr	(	((iColor>>16)&0xff)/255.0,
+												((iColor>>8)&0xff)/255.0,
+												((iColor>>0)&0xff)/255.0,
+												((iColor>>24)&0xff)/255.0 );
+
 				// Activate component
 				pcLight->RegisterComponent();
 
 				//	Load defaults into new component
-				bColor	= true;
-				bIntense	= true;
+				pcLight->SetLightColor(clr);
+				pcLight->SetIntensity(fIntense);
 
 				// Root component has changed
 				SetRootComponent(pcLight);
@@ -187,9 +128,17 @@ bool AnLight :: tickMain ( float fD )
 				}	// if
 			}	// if
 
-		// Complete
-		bType = false;
 		}	// if
 
-	return bWrk;
-	}	// tickMain
+	// Intensity
+	else if (!WCASECMP(pwLoc,L"Intensity/OnFire/Value"))
+		{
+		fIntense = adtFloat(v);
+
+		// Update
+		if (pcLight != NULL)
+			pcLight->SetIntensity(fIntense);
+		}	// if
+
+	}	// onValue
+

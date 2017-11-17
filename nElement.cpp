@@ -20,11 +20,13 @@ AnElement :: AnElement ( void )
 	pLoc			= NULL;
 	strLoc		= L"";
 	bRun			= false;
-	iState		= ELEM_STATE_INIT;
-	fTi.Set(0,0,0);
-	fTf.Set(0,0,0);
-	fS.Set(1,1,1);
-	fR.Set(0,0,0);
+	fT				= FVector(0,0,0);
+	fS				= FVector(1,1,1);
+	fR				= FVector(0,0,0);
+
+	// You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
+
 	}	// AnElement
 
 AnElement :: ~AnElement ( void )
@@ -56,8 +58,9 @@ void AnElement::BeginPlay()
 	// Running
 	bRun = true;
 
-	// Schedule work for initial setup
-	CCLTRY ( pLoc->addMain ( this ) );
+	// Request listen of location for this element
+	dbgprintf ( L"AnElement::workTick:Listen %s\r\n", (LPCWSTR)strLstn );
+	CCLTRY ( pLoc->addListen ( strLoc, this ) );
 	}	// BeginPlay
 
 void AnElement::EndPlay(const EEndPlayReason::Type rsn )
@@ -72,12 +75,8 @@ void AnElement::EndPlay(const EEndPlayReason::Type rsn )
 	// Debug
 	UE_LOG(LogTemp, Warning, TEXT("AnElement::EndPlay"));
 
-	// Add work to unlisten element
-	if (pLoc != NULL)
-		{
-		iState = ELEM_STATE_STOP;
-		pLoc->addWork(this);
-		}	// if
+	// Not running
+	bRun = true;
 
 	// Base behaviour
 	Super::EndPlay(rsn);
@@ -100,8 +99,8 @@ void AnElement :: init ( AnLoc *_pLoc, const WCHAR *pwLoc )
 	pLoc		= _pLoc;
 	strLoc	= pwLoc;	strLoc.at();
 	bRun		= false;
-	iState	= ELEM_STATE_INIT;
 	}	// init
+
 /*
 void AnElement :: onButton ( IDictionary *pDct, const WCHAR *wName,
 											const WCHAR *wState )
@@ -132,7 +131,7 @@ void AnElement :: onButton ( IDictionary *pDct, const WCHAR *wName,
 	CCLTRY ( pRenLoc->addStore ( strLocEv, adtIUnknown(pDct) ) );
 	}	// onButton
 */
-bool AnElement :: onValue (	const WCHAR *pwRoot, 
+void AnElement :: onValue (	const WCHAR *pwRoot, 
 										const WCHAR *pwLoc,
 										const ADTVALUE &v )
 	{
@@ -156,7 +155,6 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 	bool	bA1	= false;
 	bool	bA2	= false;
 	bool	bA3	= false;
-	bool	bSch	= false;
 
 //	adtString	strV;
 
@@ -171,15 +169,28 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 //						(LPCWSTR)pParent->strLoc, pwRoot, pwLoc );
 //		}	// if
 
+	// Actor running ? Should not get here
+	if (!bRun)
+		return;
+
 	//
 	// Handle paths common to all elements
 	//
+
+	// Most states affects root component
+	USceneComponent	
+	*pRoot = GetRootComponent();
 
 	// Translation
 	if (	(bA1 = !WCASECMP(pwLoc,L"Element/Transform/Translate/A1/OnFire/Value")) == true ||
 			(bA2 = !WCASECMP(pwLoc,L"Element/Transform/Translate/A2/OnFire/Value")) == true ||
 			(bA3 = !WCASECMP(pwLoc,L"Element/Transform/Translate/A3/OnFire/Value")) == true )
 			{
+			// Should movement happen over time or immediately ?
+			// Change over time to projectile or something so that
+			// position is set before higher level primitives take over
+			// like the projectile.
+			FTransform	fX		= pRoot->GetRelativeTransform();
 			adtDouble	dV(v);
 
 			// Debug
@@ -187,25 +198,13 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 //							(LPCWSTR)pParent->strLoc, pwRoot, pwLoc, (double)dV );
 
 			// Set component
-			if			(bA1)
-				{
-				fTf.X	= dV;//*10;
-				fTt.X	= SZ_TIME_MOVE;
-				}	// if
-			else if	(bA2)
-				{
-				fTf.Y	= dV;//*10;
-				fTt.Y	= SZ_TIME_MOVE;
-				}	// else if
-			else				
-				{
-				fTf.Z	= dV;//*10;
-				fTt.Z	= SZ_TIME_MOVE;
-				}	// else
+			if			(bA1)	fT.X = dV;
+			else if	(bA2) fT.Y = dV;
+			else if  (bA3) fT.Z = dV;
 
-			// Schedule work on game thread to perform update
-			bTrans	= true;
-			bSch		= true;
+			// New transform with the new position
+			fX.SetTranslation ( fT );
+			pRoot->SetRelativeTransform(fX);
 			}	// if
 
 	// Scale
@@ -214,6 +213,9 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 				(bA3 = !WCASECMP(pwLoc,L"Element/Transform/Scale/A3/OnFire/Value")) == true )
 			{
 			adtDouble	dV(v);
+
+			// Current transform
+			FTransform	fX		= pRoot->GetRelativeTransform();
 
 //			if (dV != 1)
 //				dbgprintf ( L"Hi\r\n" );
@@ -226,13 +228,9 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 			else				
 				fS.Z	= (dV != 0.0) ? (double)dV : 1.0;
 
-			// Debug
-//			if (fS.X == 0 || fS.Y == 0 || fS.Z == 0)
-//				dbgprintf ( L"fS (%g,%g,%g)\r\n", fS.X, fS.Y, fS.Z );
-
-			// Schedule work on game thread to perform update
-			bScl	= true;
-			bSch	= true;
+			// Update transform
+			fX.SetScale3D ( fS );
+			pRoot->SetRelativeTransform ( fX );
 			}	// if
 
 	// Rotation
@@ -242,50 +240,50 @@ bool AnElement :: onValue (	const WCHAR *pwRoot,
 			{
 			adtDouble	dV(v);
 
+			// Current transform
+			FTransform	t = pRoot->GetRelativeTransform();
+
 			// Debug
 //			if (dV != 1)
 //				dbgprintf ( L"Hi\r\n" );
 
 			// Set component
-			if			(bA1)
-				{
-				fR.X		= dV;
-				bRot[0]	= true;
-				}	// if
-			else if	(bA2)
-				{
-				fR.Y		= dV;
-				bRot[1]	= true;
-				}	// if
-			else				
-				{
-				fR.Z		= dV;
-				bRot[2]	= true;
-				}	// if
+			if			(bA1)	fRotNow.X = dV;
+			else if	(bA2)	fRotNow.Y = dV;
+			else				fRotNow.Z = dV;	
 
-			// Schedule work on game thread to perform update
-			bSch = true;
+			// Set rotation
+			t.SetRotation(FQuat::MakeFromEuler(fRotNow));
+
+			// New transform
+			pRoot->SetRelativeTransform ( t );
 			}	// if
 
 	// Visible
 	else if (!WCASECMP(pwLoc,L"Element/Visible/OnFire/Value"))
 		{
-		// Notify of new state
-//		dbgprintf ( L"Visible %d\r\n", v.vbool );
-		iVisible = (adtBool(v) == true) ? 1 : 0;
-		bSch = true;
+		adtBool bVisible(v);
+
+		// Change ?
+		if (	(bVisible && !pRoot->bVisible) ||
+				(!bVisible && pRoot->bVisible) )
+			{
+			dbgprintf ( L"UAnElement::mainTick:Visible %d\r\n", bVisible );
+
+			// Set new visible state
+			pRoot->SetVisibility ( bVisible, true );
+			pRoot->SetActive(pRoot->bVisible);
+			}	// if
+
 		}	// else if
 
 	// Color
 	else if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
 		{
-		// Notify of new state
+		// Cache new state
 		iColor	= adtInt(v);
-		bColor	= true;
-		bSch		= true;
 		}	// else if
 
-	return bSch;
 	}	// onValue
 /*
 void AnElement :: onRay ( IDictionary *pDct, const FVector &vLoc,
@@ -321,49 +319,6 @@ void AnElement :: onRay ( IDictionary *pDct, const FVector &vLoc,
 	CCLTRY ( pRenLoc->addStore ( strLocEv, adtIUnknown(pDct) ) );
 	}	// onRay
 */
-HRESULT AnElement :: onReceive (	const WCHAR *pwRoot, 
-											const WCHAR *pwLoc,
-											const ADTVALUE &v )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
-	//
-	//	PURPOSE
-	//		-	Called when a listened location receives a value.
-	//
-	//	PARAMETERS
-	//		-	pwRoot is the path to the listened location
-	//		-	pwLoc is the location relative to the root for the value
-	//		-	v is the value
-	//
-	//	RETURN VALUE
-	//		S_OK if successful
-	//
-	////////////////////////////////////////////////////////////////////////
-	bool			bSch	= false;
-
-	// Debug
-//	adtString	strV;
-//	adtValue::toString(v,strV);
-//	UE_LOG(LogTemp, Warning, TEXT("AnElement::onReceive:%s:%s:%s"), 
-//				pwRoot, pwLoc, (LPCWSTR)strV );
-
-	// Process value
-	bSch = onValue(pwRoot,pwLoc,v);
-
-	// Forward to root component
-//	if (pOuter != NULL)
-//		bSch = pOuter->onReceive ( this, pwRoot, pwLoc, v );
-
-	// Schedule game loop work if requested
-	if (bSch)
-		pLoc->addMain ( this );
-
-	return S_OK;
-	}	// onReceive
-
 void AnElement :: rootUpdate ( void )
 	{
 	////////////////////////////////////////////////////////////////////////
@@ -373,225 +328,48 @@ void AnElement :: rootUpdate ( void )
 	//
 	////////////////////////////////////////////////////////////////////////
 
-	// Update internal state on next game loop
-	bTrans	= true;
-	bScl		= true;
-	bRot[0]	= true;
-	bRot[1]	= true;
-	bRot[2]	= true;
-	bColor	= true;
-
-	// Schedule main loop work
-	pLoc->addMain(this);
-	}	// rootUpdate
-
-bool AnElement :: tickMain ( float fD )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Execute work for main game thread.
-	//
-	//	PARAMETERS
-	//		-	fD is the amount of elapsed time since last game loop tick.
-	//
-	//	RETURN VALUE
-	//		true if work is still needed
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr		= S_OK;
-	bool		bWrk	= false;
-
-	// Most states affects root component
+	// The root component has changed
 	USceneComponent	
 	*pRoot = GetRootComponent();
 
-	// Actor is running
-	if (iState == ELEM_STATE_RUN && pRoot != NULL)
+	// Update transform
+	if (pRoot != NULL)
 		{
-		// Update states
-
-		// Translation
-		if (fTt.X > 0 || fTt.Y > 0 || fTt.Z > 0)
-			{
-			// Current transform
-			FTransform	fX		= pRoot->GetRelativeTransform();
-			FVector		fNow	= fX.GetTranslation();
-
-			// Debug.  'Snap to' location.
-	//		fD = 10;
-
-			// Initial 'from' location
-			if (fTt.X == SZ_TIME_MOVE)
-				fTi.X = fNow.X;
-			if (fTt.Y == SZ_TIME_MOVE)
-				fTi.Y = fNow.Y;
-			if (fTt.Z == SZ_TIME_MOVE)
-				fTi.Z = fNow.Z;
-
-			// Debug
-	//		if (fTf.X != 0 || fTf.Y != 0 || fTf.Z != 0)
-	//			dbgprintf ( L"(%g,%g,%g) -> (%g,%g,%g)\r\n", 
-	//							fTi.X, fTi.Y, fTi.Z, fTf.X, fTf.Y, fTf.Z );
-	//		if (fTf.X != 0 || fTf.Y != 0 || fTf.Z != 0)
-	//			dbgprintf ( L"Hi\r\n" );
-
-			// Move component into position over given time.
-			if (fTt.X > 0)
-				{
-				fTt.X		= (fTt.X < fD) ? 0 : (fTt.X-fD);
-				fNow.X	= ((fTi.X-fTf.X)*(fTt.X/SZ_TIME_MOVE))+fTf.X;
-				}	// if
-			if (fTt.Y > 0)
-				{
-				fTt.Y		= (fTt.Y < fD) ? 0 : (fTt.Y-fD);
-				fNow.Y	= ((fTi.Y-fTf.Y)*(fTt.Y/SZ_TIME_MOVE))+fTf.Y;
-				}	// if
-			if (fTt.Z > 0)
-				{
-				fTt.Z		= (fTt.Z < fD) ? 0 : (fTt.Z-fD);
-				fNow.Z	= ((fTi.Z-fTf.Z)*(fTt.Z/SZ_TIME_MOVE))+fTf.Z;
-				}	// if
-
-			// Need work again ?
-			bWrk = (fTt.X > 0 || fTt.Y > 0 || fTt.Z > 0);
-
-	//		if (!bWrk)
-	//			dbgprintf ( L"Hi\r\n" );
-			// Update transform
-	//		fTt.Set(0,0,0);
-	//		fNow.Set(fTf.X,fTf.Y,fTf.Z);
-	//		FVector	fS = fX.GetScale3D();
-	//		if (!bWrk)
-	//			dbgprintf ( L"%p (%g,%g,%g) (%g,%g,%g)\r\n", this, 
-	//							fNow.X, fNow.Y, fNow.Z, fS.X, fS.Y, fS.Z );
-			fX.SetTranslation ( fNow );
-			pRoot->SetRelativeTransform(fX);
-			}	// if
-
-		// Rotation
-		if (bRot[0] || bRot[1] || bRot[2])
-			{
-			FTransform	t;
-
-			// Set new rotation values
-			if (bRot[0])	fRotNow.X = fR.X;
-			if (bRot[1])	fRotNow.Y = fR.Y;
-			if (bRot[2])	fRotNow.Z = fR.Z;
-
-			// Current transform
-			t = pRoot->GetRelativeTransform();
-
-			// Set rotation
-			t.SetRotation(FQuat::MakeFromEuler(fRotNow));
-
-			// New transform
-			pRoot->SetRelativeTransform ( t );
-
-			// Done
-			fR.Set(0,0,0);
-			bRot[0] = bRot[1] = bRot[2] = false;
-			}	// if
-
-		// Scale
-		if (bScl)
-			{
-			// Current transform
-			FTransform	fX		= pRoot->GetRelativeTransform();
-			FVector		fScl	= fX.GetScale3D();
-
-			// Update scale
-			if (fS.X != 0)
-				fScl.X = fS.X;
-			if (fS.Y != 0)
-				fScl.Y = fS.Y;
-			if (fS.Z != 0)
-				fScl.Z = fS.Z;
-
-			// Update transform
-			fX.SetScale3D ( fScl );
-			pRoot->SetRelativeTransform ( fX );
-
-			// Done
-			bScl = false;
-			}	// if
-
-		// Visibility
-		if (iVisible != -1)
-			{
-			// Change ?
-			if (	(iVisible == 1 && !pRoot->bVisible) ||
-					(iVisible == 0 && pRoot->bVisible) )
-				{
-				dbgprintf ( L"UAnElement::mainTick:Visible %d\r\n", iVisible );
-
-				// Set new visible state
-				pRoot->SetVisibility ( (iVisible == 1) ? true : false, true );
-				pRoot->SetActive(pRoot->bVisible);
-				}	// if
-
-			// Updated
-			iVisible = -1;
-			}	// if
-
+		FTransform	fX		= pRoot->GetRelativeTransform();
+		fX.SetTranslation ( fT );
+		fX.SetScale3D ( fS );
+		fX.SetRotation (FQuat::MakeFromEuler(fRotNow));
+		pRoot->SetRelativeTransform ( fX );
 		}	// if
 
-	// Initializing
-	else if (iState == ELEM_STATE_INIT)
-		{
-		// Schedule worker thread for listening to remote location
-		if (hr == S_OK)// && strLoc.length() > 0)
-			{
-			iState = ELEM_STATE_LISTEN;
-			hr = pLoc->addWork ( this );
-			}	// if
-		}	// else if
+	// Update internal state on next game loop
+//	bTrans	= true;
+//	bScl		= true;
+//	bRot[0]	= true;
+//	bRot[1]	= true;
+//	bRot[2]	= true;
+//	bColor	= true;
 
-	return bWrk;
-	}	// tickMain
+	}	// rootUpdate
 
-bool AnElement :: tickWork ( void )
+void AnElement :: Tick( float DeltaTime )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	PURPOSE
-	//		-	Execute work for worker thread.
+	//		-	Called every frame
 	//
-	//	RETURN VALUE
-	//		true if element needs more work
+	//	PARAMETERS
+	//		-	DeltaTime is amount of elapased time.
 	//
 	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr	= S_OK;
 
-	// Element state
-	switch (iState)
-		{
-		// Listening to remote element needs to be setup
-		case ELEM_STATE_LISTEN :
+	// Base behaviour
+	Super::Tick( DeltaTime );
 
-			// Generate path to visual minus the _Location field
-			CCLTRY ( adtValue::copy ( pLoc->strLocRen, strLstn ) );
-			CCLTRY ( strLstn.append ( strLoc ) );
-
-			// Request listen of location for this element
-			dbgprintf ( L"AnElement::workTick:Listen %s\r\n", (LPCWSTR)strLstn );
-			CCLTRY ( pLoc->pSpc->pCli->listen ( strLstn, true, this ) );
-
-			// Transition into running state
-			iState = (hr == S_OK) ? ELEM_STATE_RUN : ELEM_STATE_ERROR;
-			break;
-
-		// Unlisten from current state :
-		case ELEM_STATE_STOP :
-			// Clean up (worker thread)
-			if (pLoc != NULL && strLstn.length() > 0)
-				pLoc->pSpc->pCli->listen ( strLstn, false );
-			iState = ELEM_STATE_ERROR;
-			break;
-		}	// switch
-
-	return false;
-	}	// workTick
+	// Distribute received values
+	dequeue();
+	}	// Tick
 
 //
 // AnElementRef

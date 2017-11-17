@@ -20,7 +20,6 @@ AnShape::AnShape()
 	pcShp		= NULL;
 	pMatDyn	= NULL;
 	pMat		= NULL;
-	bColor	= false;
 	iColor	= -1;
 
 	// Globals
@@ -106,14 +105,11 @@ void AnShape :: EndPlay ( const EEndPlayReason::Type rsn )
 	AnElement::EndPlay(rsn);
 	}	// EndPlay
 
-bool AnShape :: onValue (	const WCHAR *pwRoot, 
+void AnShape :: onValue (	const WCHAR *pwRoot, 
 									const WCHAR *pwLoc,
 									const ADTVALUE &v )
 	{
 	////////////////////////////////////////////////////////////////////////
-	//
-	//	OVERLOAD
-	//	FROM		nSpaceClientCB
 	//
 	//	PURPOSE
 	//		-	Called when a listened location receives a value.
@@ -123,61 +119,16 @@ bool AnShape :: onValue (	const WCHAR *pwRoot,
 	//		-	pwLoc is the location relative to the root for the value
 	//		-	v is the value
 	//
-	//	RETURN VALUE
-	//		true if there is main game loop to be scheduled.
-	//
 	////////////////////////////////////////////////////////////////////////
-	bool	bSch	= false;
 
 	// Debug
 //	UE_LOG(LogTemp, Log, TEXT("AnShape::onValue:%s:%s"), pwRoot, pwLoc );
 
 	// Base behaviour
-	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+	AnElement::onValue(pwRoot,pwLoc,v);
 
 	// Color
 	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
-		{
-		// Color update
-		iColor= adtInt(v);
-		bColor= true;
-		bSch	= true;
-		}	// if
-
-	// Name
-	else if (!WCASECMP(pwLoc,L"Name/OnFire/Value"))
-		{
-		// Shape name update
-		adtValue::copy ( adtString(v), strName );
- 		strName.at();
-		bSch	= true;
-		}	// if
-
-	return bSch;
-	}	// onValue
-
-bool AnShape :: tickMain ( float fD )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Execute work for main game thread.
-	//
-	//	PARAMETERS
-	//		-	fD is the amount of elapsed time since last game loop tick.
-	//
-	//	RETURN VALUE
-	//		true if work is still needed
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr		= S_OK;
-	bool		bWrk = false;
-
-	// Default behaviour
-	bWrk = AnElement::tickMain(fD);
-
-	// Color
-	if (bColor)
 		{
 		// Set base color of dynamic texture
 		if (pMatDyn != NULL)
@@ -187,91 +138,116 @@ bool AnShape :: tickMain ( float fD )
 											((iColor>>0)&0xff)/255.0,
 											((iColor>>24)&0xff)/255.0 ) );
 //															FLinearColor(FColor(iColor)) );
-		bColor = false;
 		}	// if
 
-	// Shape
-	if (strName[0] != '\0')
+	// Shape name
+	else if (!WCASECMP(pwLoc,L"Name/OnFire/Value"))
 		{
-		UStaticMesh	*pMesh	= NULL;
-		dbgprintf ( L"AnShape::mainTick:Shape:%s\r\n", (LPCWSTR)strName );
+		adtString strName(v);
 
-		// Previous shape
-//		if (pcShp != NULL)
-//			{
-//			pcShp->UninitializeComponent();
-//			pcShp = NULL;
-//			}	// if
-
-		// Load the appropriate mesh
-		if			(	!WCASECMP(strName,L"Sphere")	&& 
-						FSph != NULL						&& 
-						FSph->Succeeded() )
-			pMesh = Cast<UStaticMesh>(FSph->Object);
-		else if	(	!WCASECMP(strName,L"Cylinder")	&& 
-						FCyl != NULL							&& 
-						FCyl->Succeeded() )
-			pMesh = Cast<UStaticMesh>(FCyl->Object);
-		else if	(	!WCASECMP(strName,L"Cone")			&& 
-						FCon != NULL							&& 
-						FCon->Succeeded() )
-			pMesh = Cast<UStaticMesh>(FCon->Object);
-
-		// Rather than error out, default to using a cube
-		else if	(	FCub != NULL							&& 
-						FCub->Succeeded() )
-			pMesh = Cast<UStaticMesh>(FCub->Object);
-
-		// Success ?
-		if (pMesh == NULL)
-			dbgprintf ( L"AnShape::mainTick:Failed to create mesh for %s\r\n", (LPCWSTR)strName );
-
-		// Assign the loaded mesh
-		if (pMesh != NULL)
-			pcShp->SetStaticMesh ( pMesh );
-
-		// Shape specific adjustments
-		if	(!WCASECMP(strName,L"Cone"))
-			pcShp->SetRelativeLocation(FVector(0,0,+0.20));
-
-		// Update size of shape
-		if (pMesh != NULL)
+		// Shape
+		if (strName[0] != '\0')
 			{
-			FVector	fMin,fMax;
-			float		fSclMax;
+			UStaticMesh	*pMesh	= NULL;
+			dbgprintf ( L"AnShape::mainTick:Shape:%s\r\n", (LPCWSTR)strName );
 
-			// Compute the max. bounds of the mesh in order to compute scaling
-			// to a unit cube.
-			pcShp->GetLocalBounds( fMin, fMax );
-			fSclMax = 0;
-			if ((fMax.X-fMin.X) > fSclMax)
-				fSclMax = (fMax.X-fMin.X);
-			if ((fMax.Y-fMin.Y) > fSclMax)
-				fSclMax = (fMax.Y-fMin.Y);
-			if ((fMax.Z-fMin.Z) > fSclMax)
-				fSclMax = (fMax.Z-fMin.Z);
+			// Previous shape
+	//		if (pcShp != NULL)
+	//			{
+	//			pcShp->UninitializeComponent();
+	//			pcShp = NULL;
+	//			}	// if
 
-			// Scale to unit cube centered at origin (-0.5 to +0.5)
-			fSclLcl.X = +1.0/fSclMax;
-			fSclLcl.Y = fSclLcl.X;
-			fSclLcl.Z = fSclLcl.X;
+			// Load the appropriate mesh
+			if			(	!WCASECMP(strName,L"Sphere")	&& 
+							FSph != NULL						&& 
+							FSph->Succeeded() )
+				pMesh = Cast<UStaticMesh>(FSph->Object);
+			else if	(	!WCASECMP(strName,L"Cylinder")	&& 
+							FCyl != NULL							&& 
+							FCyl->Succeeded() )
+				pMesh = Cast<UStaticMesh>(FCyl->Object);
+			else if	(	!WCASECMP(strName,L"Cone")			&& 
+							FCon != NULL							&& 
+							FCon->Succeeded() )
+				pMesh = Cast<UStaticMesh>(FCon->Object);
 
-			// Initial scaling
-			pcShp->SetRelativeScale3D(fSclLcl);
+			// Rather than error out, default to using a cube
+			else if	(	FCub != NULL							&& 
+							FCub->Succeeded() )
+				pMesh = Cast<UStaticMesh>(FCub->Object);
 
-			// Root transform was updated
-			rootUpdate();
+			// Success ?
+			if (pMesh == NULL)
+				dbgprintf ( L"AnShape::mainTick:Failed to create mesh for %s\r\n", (LPCWSTR)strName );
+
+			// Assign the loaded mesh
+			if (pMesh != NULL)
+				pcShp->SetStaticMesh ( pMesh );
+
+			// Shape specific adjustments
+			if	(!WCASECMP(strName,L"Cone"))
+				pcShp->SetRelativeLocation(FVector(0,0,+0.20));
+
+			// Update size of shape
+			if (pMesh != NULL)
+				{
+				FVector	fMin,fMax;
+				float		fSclMax;
+
+				// Compute the max. bounds of the mesh in order to compute scaling
+				// to a unit cube.
+				pcShp->GetLocalBounds( fMin, fMax );
+				fSclMax = 0;
+				if ((fMax.X-fMin.X) > fSclMax)
+					fSclMax = (fMax.X-fMin.X);
+				if ((fMax.Y-fMin.Y) > fSclMax)
+					fSclMax = (fMax.Y-fMin.Y);
+				if ((fMax.Z-fMin.Z) > fSclMax)
+					fSclMax = (fMax.Z-fMin.Z);
+
+				// Scale to unit cube centered at origin (-0.5 to +0.5)
+				fSclLcl.X = +1.0/fSclMax;
+				fSclLcl.Y = fSclLcl.X;
+				fSclLcl.Z = fSclLcl.X;
+
+				// Initial scaling
+				pcShp->SetRelativeScale3D(fSclLcl);
+
+				// Root transform was updated
+				rootUpdate();
+				}	// if
+
+		//
+		// Collision
+		//	- Unreal seems to need the collision mesh to be the root component
+		//		of an actor.  Determine the closest fit shape based on extent
+		//		and the appropriate component type.
+		//
+
+	/*
+		// Collision sphere
+		pcColl = NewObject<USphereComponent>(pcShp,USphereComponent::StaticClass());
+		pcColl->InitSphereRadius(1.0f);
+	//	pcColl->SetupAttachment(pcShp);
+	//	pcColl->AttachToComponent(pcShp,FAttachmentTransformRules::KeepRelativeTransform);
+		pcColl->WeldTo(this);
+		pcColl->RegisterComponent();
+
+		pcColl->bVisible		= true;
+		pcColl->bHiddenInGame	= false;
+
+			pcColl->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			pcColl->SetCollisionProfileName("Default");
+			pcColl->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
+	*/
+
+			// Testing
+	//		pcShp->SetEnableGravity(false);
+	//		pcShp->SetSimulatePhysics(true);
+	//		pcShp->SetVisibility(true,true);
 			}	// if
 
-		// Testing
-//		pcShp->SetEnableGravity(false);
-//		pcShp->SetSimulatePhysics(true);
-//		pcShp->SetVisibility(true,true);
-
-		// Done
-		strName.at(0)	= '\0';
 		}	// if
 
-	return bWrk;
-	}	// tickMain
-
+	}	// onValue

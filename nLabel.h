@@ -20,8 +20,7 @@ class AnLabel :
 	// 'AnElement' class memebers
 	virtual void	BeginPlay() override;
 	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
-	virtual bool	tickMain	( float ) override;
-	virtual bool	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & ) override;
+	virtual void	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 
 	// Text rendering
 	UTextRenderComponent	*pcLbl;
@@ -29,8 +28,7 @@ class AnLabel :
 	UBoxComponent			*pcBox;
 
 	// Update label
-	adtString	strHorz,strVert,strLbl;
-	FColor		clr;
+	adtString	strHorz,strVert;
 	float			*pfXs;
 	int			iXs;
 	int			iCaret,iCaretP;

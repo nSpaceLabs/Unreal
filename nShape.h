@@ -28,7 +28,6 @@ class AnShape : public AnElement
 	// 'AnElement' class memebers
 	virtual void	BeginPlay() override;
 	virtual void	EndPlay	( const EEndPlayReason::Type ) override;
-	virtual bool	tickMain	( float ) override;
-	virtual bool	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & ) override;
+	virtual void	onValue	( const WCHAR *, const WCHAR *, const ADTVALUE & );
 
 	};

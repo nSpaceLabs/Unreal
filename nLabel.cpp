@@ -8,7 +8,6 @@ AnLabel::AnLabel()
 	//		-	Constructor for the object
 	//
 	////////////////////////////////////////////////////////////////////////
-	clr		= FColor(255,255,255,255);
 	pfXs		= NULL;
 	iXs		= 0;
 	iCaret	= -2;
@@ -206,7 +205,7 @@ void AnLabel :: measure ( void )
 
 	}	// measure
 
-bool AnLabel :: onValue (	const WCHAR *pwRoot, 
+void AnLabel :: onValue (	const WCHAR *pwRoot, 
 									const WCHAR *pwLoc,
 									const ADTVALUE &v )
 	{
@@ -223,194 +222,141 @@ bool AnLabel :: onValue (	const WCHAR *pwRoot,
 	//		-	pwLoc is the location relative to the root for the value
 	//		-	v is the value
 	//
-	//	RETURN VALUE
-	//		true if there is main game loop to be scheduled.
-	//
 	////////////////////////////////////////////////////////////////////////
-	bool	bSch	= false;
 
 	// Debug
 //	UE_LOG(LogTemp, Log, TEXT("AnLabel::onValue:%s:%s"), pwRoot, pwLoc );
 
 	// Base behaviour
-	bSch = AnElement::onValue(pwRoot,pwLoc,v);
+	AnElement::onValue(pwRoot,pwLoc,v);
+
+	// Color
+	if (!WCASECMP(pwLoc,L"Element/Color/OnFire/Value"))
+		{
+		pcLbl->SetTextRenderColor ( FColor ( iColor ) );
+		}	// if
 
 	// Text for label
-//	if (	!WCASECMP(pwLoc,L"Element/Label/OnFire/Value") ||
-//	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/Value/OnFire/Value") )
-	if (	!WCASECMP(pwLoc,L"Interface/Element/Default/OnFire/Value") )
+	else if (!WCASECMP(pwLoc,L"Interface/Element/Default/OnFire/Value") )
 		{
-		adtString strV(v);
+		adtString strLbl(v);
 
 		// Debug
 //		dbgprintf ( L"AnLabel::onReceive:%s:%s:%s\r\n",	
 //						pwLoc, (LPCWSTR)pParent->strLoc, (LPCWSTR)adtString(v) );
 
-		// Label to update
-		if (strV.length() > 0)
+		// Label ?
+		if (strLbl.length() > 0)
 			{
-			// Own the string
-			strLbl = (LPCWSTR) strV;
-			strLbl.at();
-			bSch = true;
+			// Use new text
+			pcLbl->SetText ( FText::FromString((LPCWSTR)strLbl) );
+
+			// Debug
+	//		if (!WCASECMP(strHorz,L"Right"))
+	//			dbgprintf ( L"Hi\r\n" );
+
+			// Scale box to just cover the bounds
+			// Full width of text, box scaling is half that
+			// Ensure text is covered by slightly increasing Z
+			// Must use 'local' coordinate system that the text render component uses.
+			FVector 
+			fSz = pcLbl->GetTextLocalSize();
+			fSz.X = 1.1;
+			fSz.Y /= 2;
+			fSz.Z /= 2;
+
+			// Take into account alignment
+			FVector fOff(0,0,0);
+			fOff = pcBox->GetRelativeTransform().GetLocation();
+			if (!WCASECMP(strHorz,L"Left"))
+				fOff.Y = -fSz.Y;
+			else if (!WCASECMP(strHorz,L"Right"))
+				fOff.Y = fSz.Y;
+
+			// Update bounding box
+			pcBox->SetBoxExtent ( fSz, true );
+			pcBox->SetRelativeLocation(fOff);
+
+			// Measure the current label
+			measure();
+
+			// Caret needs updating
+			if (iCaret == -2)
+				iCaret	= iCaretP;
 			}	// if
+
 		}	// if
 
 	// Alignment
 	else if (!WCASECMP(pwLoc,L"AlignHorz/OnFire/Value"))
 		{
-		adtValue::toString ( v, strHorz );
-		strHorz.at();
-		bSch		= true;
-		}	// if
-	else if (!WCASECMP(pwLoc,L"AlignVert/OnFire/Value"))
-		{
-		adtValue::toString ( v, strVert );
-		strVert.at();
-		bSch		= true;
-		}	// if
-
-	// Caret position
-	else if (!WCASECMP(pwLoc,L"Caret/OnFire/Value"))
-		{
-		iCaret	= adtInt(v);
-		bSch		= true;
-		}	// if
-
-	return bSch;
-	}	// onValue
-
-bool AnLabel :: tickMain ( float fD )
-	{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//	PURPOSE
-	//		-	Execute work for main game thread.
-	//
-	//	PARAMETERS
-	//		-	fD is the amount of elapsed time since last game loop tick.
-	//
-	//	RETURN VALUE
-	//		true if work is still needed
-	//
-	////////////////////////////////////////////////////////////////////////
-	HRESULT	hr		= S_OK;
-	bool		bWrk = false;
-
-	// Default behaviour
-	bWrk = AnElement::tickMain(fD);
-
-	// Label ?
-	if (strLbl[0] != '\0')
-		{
-		// Use new text
-		pcLbl->SetText ( FText::FromString((LPCWSTR)strLbl) );
-		strLbl.at(0) = '\0';
-
-		// Debug
-//		if (!WCASECMP(strHorz,L"Right"))
-//			dbgprintf ( L"Hi\r\n" );
-
-		// Scale box to just cover the bounds
-		// Full width of text, box scaling is half that
-		// Ensure text is covered by slightly increasing Z
-		// Must use 'local' coordinate system that the text render component uses.
-		FVector 
-		fSz = pcLbl->GetTextLocalSize();
-		fSz.X = 1.1;
-		fSz.Y /= 2;
-		fSz.Z /= 2;
-
-		// Take into account alignment
-		FVector fOff(0,0,0);
-		fOff = pcBox->GetRelativeTransform().GetLocation();
-		if (!WCASECMP(strHorz,L"Left"))
-			fOff.Y = -fSz.Y;
-		else if (!WCASECMP(strHorz,L"Right"))
-			fOff.Y = fSz.Y;
-
-		// Update bounding box
-		pcBox->SetBoxExtent ( fSz, true );
-		pcBox->SetRelativeLocation(fOff);
-
-		// Measure the current label
-		measure();
-
-		// Caret needs updating
-		if (iCaret == -2)
-			iCaret	= iCaretP;
-		}	// if
-
-	// Alignment
-	if (strHorz[0] != '\0')
-		{
+		adtValue::toString(v,strHorz);
 		pcLbl->SetHorizontalAlignment ( 
 			(!WCASECMP(strHorz,L"Left"))	?	EHorizTextAligment::EHTA_Left :
 			(!WCASECMP(strHorz,L"Right")) ?	EHorizTextAligment::EHTA_Right :
 														EHorizTextAligment::EHTA_Center );
-		strHorz.at(0) = '\0';
 		}	// if
-	if (strVert[0] != '\0')
+	else if (!WCASECMP(pwLoc,L"AlignVert/OnFire/Value"))
 		{
+		adtValue::toString(v,strVert);
+
 		// No 'SetVerticalAlignment' ?  Does this work ?
 		pcLbl->VerticalAlignment	=
 			(!WCASECMP(strVert,L"Top"))		?	EVerticalTextAligment::EVRTA_TextTop :
 			(!WCASECMP(strVert,L"Bottom"))	?	EVerticalTextAligment::EVRTA_TextBottom	:
 															EVerticalTextAligment::EVRTA_TextCenter;
-		strVert.at(0) = '\0';
 		}	// if
 
-	// Color
-	if (bColor)
+	// Caret position
+	else if (!WCASECMP(pwLoc,L"Caret/OnFire/Value"))
 		{
-		pcLbl->SetTextRenderColor ( FColor ( iColor ) );
-		bColor = false;
-		}	// if
+		iCaret = adtInt(v);
 
-	// Caret
-	if (iCaret != -2)
-		{
-		// Set position and visibility of caret
-		if (iCaret >= 0)
+		// Caret
+		if (iCaret != -2)
 			{
-			// Position caret at index
-			if (iCaret < iXs)
+			// Set position and visibility of caret
+			if (iCaret >= 0)
 				{
-				// Extent of box surrounding text and receving input
-				FVector
-				szBox = pcBox->GetUnscaledBoxExtent();
+				// Position caret at index
+				if (iCaret < iXs)
+					{
+					// Extent of box surrounding text and receving input
+					FVector
+					szBox = pcBox->GetUnscaledBoxExtent();
 
-				// Current location 
-				FVector 
-				fLoc = pcCrt->GetRelativeTransform().GetLocation();
+					// Current location 
+					FVector 
+					fLoc = pcCrt->GetRelativeTransform().GetLocation();
 
-				// Compute new location
-				fLoc.Y = szBox.Y - pfXs[iCaret];
-				fLoc.Z = -szBox.Z;
+					// Compute new location
+					fLoc.Y = szBox.Y - pfXs[iCaret];
+					fLoc.Z = -szBox.Z;
 
-				// Move into position using text coordinate system
-				pcCrt->SetRelativeLocation ( fLoc );
+					// Move into position using text coordinate system
+					pcCrt->SetRelativeLocation ( fLoc );
 
-				// Ensure visible
-				pcCrt->bHiddenInGame = false;
-				pcCrt->SetVisibility(true,true);
+					// Ensure visible
+					pcCrt->bHiddenInGame = false;
+					pcCrt->SetVisibility(true,true);
+					}	// if
 				}	// if
+
+			// -1 means no caret
+			else
+				{
+				pcCrt->bHiddenInGame = true;
+				pcCrt->SetVisibility(false,true);
+				}	// else
+
+			// Updated
+			iCaretP	= iCaret;
+			iCaret	= -2;
 			}	// if
 
-		// -1 means no caret
-		else
-			{
-			pcCrt->bHiddenInGame = true;
-			pcCrt->SetVisibility(false,true);
-			}	// else
-
-		// Updated
-		iCaretP	= iCaret;
-		iCaret	= -2;
 		}	// if
 
-	return bWrk;
-	}	// tickMain
+	}	// onValue
 
 /*
 void AnLabel :: onRay ( IDictionary *pDct, const FVector &vLoc,
