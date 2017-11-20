@@ -709,16 +709,23 @@ HRESULT nValues :: dequeue ( void )
 	while (hr == S_OK && pQv->isEmpty() == S_FALSE)
 		{
 		// Next tuple
+		csQ.enter();
 		CCLTRY ( pQvIt->read ( vR ) );
 		CCLOK  ( pQvIt->next(); )
 		CCLTRY ( pQvIt->read ( vL ) );
 		CCLOK  ( pQvIt->next(); )
 		CCLTRY ( pQvIt->read ( vV ) );
 		CCLOK  ( pQvIt->next(); )
+		csQ.leave();
 
 		// Proces
-		onValue ( adtString(vR), adtString(vL), vV );
+		if (hr == S_OK)
+			onValue ( adtString(vR), adtString(vL), vV );
 		}	// while
+
+	// What would cause an error ?
+	if (hr != S_OK)
+		pQv->clear();
 
 	return hr;
 	}	// dequeue
@@ -743,9 +750,11 @@ HRESULT nValues :: enqueue ( const WCHAR *pwRoot, const WCHAR *pwLoc,
 	HRESULT	hr = S_OK;
 
 	// Add to queue
+	csQ.enter();
 	CCLTRY ( pQv->write ( adtString(pwRoot) ) );
 	CCLTRY ( pQv->write ( adtString(pwLoc) ) );
 	CCLTRY ( pQv->write ( v ) );
+	csQ.leave();
 
 	return S_OK;
 	}	// enqueue
@@ -771,7 +780,7 @@ HRESULT nValues :: onReceive (	const WCHAR *pwRoot,
 	//		S_OK if successful
 	//
 	////////////////////////////////////////////////////////////////////////
-	UE_LOG(LogTemp, Warning, TEXT("nValues::onReceive"));
+//	UE_LOG(LogTemp, Warning, TEXT("nValues::onReceive"));
 
 	// Queue it for later distribution in game thread
 	return enqueue ( pwRoot, pwLoc, v );

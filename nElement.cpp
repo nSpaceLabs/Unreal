@@ -190,8 +190,12 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			// Change over time to projectile or something so that
 			// position is set before higher level primitives take over
 			// like the projectile.
-			FTransform	fX		= pRoot->GetRelativeTransform();
+			FTransform	fX;
 			adtDouble	dV(v);
+
+			// Component currently active ?
+			if (pRoot != NULL)
+				fX		= pRoot->GetRelativeTransform();
 
 			// Debug
 //			dbgprintf ( L"UAnElement::onReceive:Translate:%s:%s:%s:%g\r\n", 
@@ -204,7 +208,8 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 
 			// New transform with the new position
 			fX.SetTranslation ( fT );
-			pRoot->SetRelativeTransform(fX);
+			if (pRoot != NULL)
+				pRoot->SetRelativeTransform(fX);
 			}	// if
 
 	// Scale
@@ -215,7 +220,9 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			adtDouble	dV(v);
 
 			// Current transform
-			FTransform	fX		= pRoot->GetRelativeTransform();
+			FTransform	fX;
+			if (pRoot != NULL)
+				fX		= pRoot->GetRelativeTransform();
 
 //			if (dV != 1)
 //				dbgprintf ( L"Hi\r\n" );
@@ -230,7 +237,8 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 
 			// Update transform
 			fX.SetScale3D ( fS );
-			pRoot->SetRelativeTransform ( fX );
+			if (pRoot != NULL)
+				pRoot->SetRelativeTransform ( fX );
 			}	// if
 
 	// Rotation
@@ -241,7 +249,9 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			adtDouble	dV(v);
 
 			// Current transform
-			FTransform	t = pRoot->GetRelativeTransform();
+			FTransform	t;
+			if (pRoot != NULL)
+				t = pRoot->GetRelativeTransform();
 
 			// Debug
 //			if (dV != 1)
@@ -256,23 +266,27 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			t.SetRotation(FQuat::MakeFromEuler(fRotNow));
 
 			// New transform
-			pRoot->SetRelativeTransform ( t );
+			if (pRoot != NULL)
+				pRoot->SetRelativeTransform ( t );
 			}	// if
 
 	// Visible
 	else if (!WCASECMP(pwLoc,L"Element/Visible/OnFire/Value"))
 		{
-		adtBool bVisible(v);
+		bVisible = adtBool(v);
 
 		// Change ?
-		if (	(bVisible && !pRoot->bVisible) ||
-				(!bVisible && pRoot->bVisible) )
+		if (pRoot != NULL)
 			{
-			dbgprintf ( L"UAnElement::mainTick:Visible %d\r\n", bVisible );
+			if (	(bVisible && !pRoot->bVisible) ||
+					(!bVisible && pRoot->bVisible) )
+				{
+				dbgprintf ( L"UAnElement::mainTick:Visible %d\r\n", bVisible );
 
-			// Set new visible state
-			pRoot->SetVisibility ( bVisible, true );
-			pRoot->SetActive(pRoot->bVisible);
+				// Set new visible state
+				pRoot->SetVisibility ( bVisible, true );
+				pRoot->SetActive(pRoot->bVisible);
+				}	// if
 			}	// if
 
 		}	// else if

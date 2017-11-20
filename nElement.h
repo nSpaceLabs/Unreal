@@ -68,6 +68,7 @@ class AnElement :
 	FVector		fSclLcl;									// Local scaling (if needed)
 	FVector		fRotNow;									// Current rotation
 	int			iColor;									// 32-bit color
+	bool			bVisible;								// Should be visible ?
 
 	// Utilities
 	void	init			( AnLoc *, const WCHAR * );// Initialize state

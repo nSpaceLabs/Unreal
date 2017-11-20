@@ -142,7 +142,7 @@ pcProj->Activate();
 					((bY = (WCASECMP(pwLoc,L"Velocity/A2/OnFire/Value") == 0)) == true) ||
 					((bZ = (WCASECMP(pwLoc,L"Velocity/A3/OnFire/Value") == 0)) == true) )
 		{
-		UE_LOG(LogTemp, Warning, TEXT("AnProjectile::Velocity"));
+//		UE_LOG(LogTemp, Warning, TEXT("AnProjectile::Velocity"));
 
 		// Shape Type update
 		if			(bX)	fX = v;

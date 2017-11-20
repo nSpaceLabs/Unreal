@@ -73,6 +73,7 @@ class nValues :
 	// Run-time data
 	IList	*pQv;												// Value queue
 	IIt	*pQvIt;											// Value queue iterator
+	sysCS	csQ;												// Thread safety
 
 	};
 
