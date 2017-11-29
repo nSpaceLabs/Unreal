@@ -4,13 +4,13 @@
 
 #include "GameFramework/Actor.h"
 #include "nElement.h"
-#include "nProjectile.generated.h"
+#include "nPhysics.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class AnProjectile : 
+class AnPhysics : 
 	public AnElement
 	{
 	GENERATED_BODY()
@@ -18,16 +18,19 @@ class AnProjectile :
 	public:	
 
 	// Sets default values for this actor's properties
-	AnProjectile();
+	AnPhysics();
 
 	// Run-time data
-	adtFloat		fX,fY,fZ;								// Velocity
-	UProjectileMovementComponent
-					*pcProj;									// Game engine component
-	USceneComponent
-					*pcUp;									// Update target
+	adtBool		bSimulate;								// Simulate physics/gravity
+	adtBool		bGravity;								// Enable/disable gravity
+	UPrimitiveComponent
+					*pcCmp;									// Target component
+	FVector		vForce;									// Current external force vector
 	float			fUpdate,fAccum;						// Accumulated time
 	FTransform	tPrev;									// Previous transform of component
+	bool			bLimitV;									// Limit velocity ?
+	FVector		vMaxV;									// Maximum velocity
+	float			fMass;									// Desired mass (scale)
 
 	// 'AnElement' class memebers
 	virtual void	BeginPlay() override;

@@ -64,10 +64,15 @@ void AnShape :: BeginPlay ( void )
 	SetRootComponent(pcShp);
 //	pcShp->AttachToComponent(this, FAttachmentTransformRules::KeepWorldTransform);
 
-	// Testing
+	// Defaults
 	pcShp->SetMobility(EComponentMobility::Movable);
+	pcShp->SetSimulatePhysics(false);
+	pcShp->SetEnableGravity(false);
+
+	// Testing
 //	pcShp->SetSimulatePhysics(true);
 //	pcShp->SetEnableGravity(false);
+//	pcShp->SetEnableGravity(true);
 //	pcShp->SetSimulatePhysics(true);
 
 	// Assign material
@@ -250,4 +255,41 @@ void AnShape :: onValue (	const WCHAR *pwRoot,
 
 		}	// if
 
+	// Material name
+	else if (!WCASECMP(pwLoc,L"Material/OnFire/Value"))
+		{
+		char			*pcMat	= NULL;
+		adtString	strMat(v);
+
+		// To ASCII for Unreal
+		if (strMat.length() > 0 && strMat.toAscii(&pcMat) == S_OK)
+			{
+			FStringAssetReference	path(pcMat);
+			UObject						*pObj;
+
+			// If valid, assign materal
+			if (	(pObj = path.TryLoad()) != NULL &&
+					(pMat = Cast<UMaterialInterface> ( pObj )) != NULL )
+				{
+				// In order to change the color a dynamic material must be used
+				pMatDyn = UMaterialInstanceDynamic::Create(pMat,this);
+
+				// Default color
+				pMatDyn->SetVectorParameterValue (	FName("Color"), 
+							FLinearColor(	((iColor>>16)&0xff)/255.0,
+												((iColor>>8)&0xff)/255.0,
+												((iColor>>0)&0xff)/255.0,
+												((iColor>>24)&0xff)/255.0 ) );
+
+				// Assign material to component
+				pcShp->SetMaterial(0,pMatDyn);
+				}	// if
+
+			// Clean up
+			_FREEMEM(pcMat);
+			}	// if
+
+		}	// else if
+
 	}	// onValue
+

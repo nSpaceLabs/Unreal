@@ -1,6 +1,6 @@
-#include "nProjectile.h"
+#include "nPhysics.h"
 
-AnProjectile::AnProjectile()
+AnPhysics::AnPhysics()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -10,17 +10,17 @@ AnProjectile::AnProjectile()
 	////////////////////////////////////////////////////////////////////////
 
 	// Setup
-	pcProj	= NULL;
-	pcUp		= NULL;
-	fX			= 0.0f;
-	fY			= 0.0f;
-	fZ			= 0.0f;
+	pcCmp			= NULL;
+	bSimulate	= false;
+	bGravity		= false;
+	fMass			= 1.0f;
+	vForce.Set(0,0,0);
 	fAccum	= 0.0f;
 	fUpdate	= 0.0f;
 	tPrev.SetIdentity();
-	}	// AnProjectile
+	}	// AnPhysics
 
-void AnProjectile::BeginPlay()
+void AnPhysics::BeginPlay()
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -30,46 +30,22 @@ void AnProjectile::BeginPlay()
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("AnProjectile::BeginPlay"));
+	UE_LOG(LogTemp, Warning, TEXT("AnPhysics::BeginPlay"));
 
 	// Default behaviour
 	Super::BeginPlay();
 
-	// Create component of the appropriate type
-	pcProj	= NewObject<UProjectileMovementComponent>
-					(this,UProjectileMovementComponent::StaticClass());
-
-	pcProj->bAutoActivate= true;
-	pcProj->bAutoUpdateTickRegistration = true;
-	pcProj->Activate();
-
 	// Defaults
-	pcProj->bRotationFollowsVelocity	= false;
-	pcProj->InitialSpeed					= 0;
-
-	// It does not seem like 'bounciness' belongs in the same
-	// visual state as 'projectile' ??
-	pcProj->bShouldBounce				= false;
-	pcProj->Bounciness					= 0.0f;
-
-	// Also, gravity handled externally ?
-	pcProj->ProjectileGravityScale	= 0;
-
-	// For debug
-//	pcProj->bRotationFollowsVelocity	= true;
-//	pcProj->bShouldBounce				= true;
-//	pcProj->Bounciness					= 1.0f;
-
-	// Place component in world
-	pcProj->RegisterComponent();
-
-	// Other setup
-	fAccum	= 0.0f;
-	fUpdate	= 0.0f;
+	pcCmp			= NULL;
+	bSimulate	= false;
+	bGravity		= false;
+	fAccum		= 0.0f;
+	fUpdate		= 0.0f;
+	tPrev.SetIdentity();
 
 	}	// BeginPlay
 
-void AnProjectile :: EndPlay ( const EEndPlayReason::Type rsn )
+void AnPhysics :: EndPlay ( const EEndPlayReason::Type rsn )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -79,18 +55,18 @@ void AnProjectile :: EndPlay ( const EEndPlayReason::Type rsn )
 	////////////////////////////////////////////////////////////////////////
 
 	// Debug
-	UE_LOG(LogTemp, Warning, TEXT("AnProjectile::EndPlay"));
+	UE_LOG(LogTemp, Warning, TEXT("AnPhysics::EndPlay"));
 
 	// Clean up
-	pcProj						= NULL;
+	pcCmp	= NULL;
 
 	// Base behaviour
 	Super::EndPlay(rsn);
 	}	// EndPlay
 
-void AnProjectile :: onValue (	const WCHAR *pwRoot, 
-											const WCHAR *pwLoc,
-											const ADTVALUE &v )
+void AnPhysics :: onValue (	const WCHAR *pwRoot, 
+										const WCHAR *pwLoc,
+										const ADTVALUE &v )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -110,18 +86,55 @@ void AnProjectile :: onValue (	const WCHAR *pwRoot,
 	// Base behaviour
 	AnElement::onValue(pwRoot,pwLoc,v);
 
-	// Target location
-	if (!WCASECMP(pwLoc,L"Location/OnFire/Value"))
+	// Simulate physics
+	if (!WCASECMP(pwLoc,L"Simulate/OnFire/Value"))
 		{
-		HRESULT		hr				= S_OK;
-		IDictionary	*pDct			= NULL;
-		nElementRef	*pElemRef	= NULL;
-		adtString	strLocAt(v);
-		adtString	strFull;
-		adtValue		vL;
-		adtIUnknown	unkV;
+		// Simulation
+		bSimulate = adtBool(v);
 
-		UE_LOG(LogTemp, Warning, TEXT("AnProjectile::Location"));
+		// Update if component valid
+		if (pcCmp != NULL)
+			pcCmp->SetSimulatePhysics(bSimulate);
+		}	// if
+
+	// Gravity enable
+	else if (!WCASECMP(pwLoc,L"Gravity/OnFire/Value"))
+		{
+		// Simulation
+		bGravity = adtBool(v);
+
+		// Update if component valid
+		if (pcCmp != NULL)
+			pcCmp->SetSimulatePhysics(bGravity);
+		}	// if
+
+	// Mass
+	else if (!WCASECMP(pwLoc,L"Mass/OnFire/Value"))
+		{
+		// New mass
+		fMass = adtFloat(v);
+
+		// Update if component valid
+		if (pcCmp != NULL)
+			pcCmp->SetMassScale(NAME_None,fMass);
+		}	// if
+
+	// Target location
+	else if (!WCASECMP(pwLoc,L"Location/OnFire/Value"))
+		{
+		HRESULT				hr				= S_OK;
+		IDictionary			*pDct			= NULL;
+		nElementRef			*pElemRef	= NULL;
+		USceneComponent	*pSc			= NULL;
+		adtString			strLocAt(v);
+		adtString			strFull;
+		adtValue				vL;
+		adtIUnknown			unkV;
+
+		UE_LOG(LogTemp, Warning, TEXT("AnPhysics::Location"));
+
+		// Zero active component
+		pcCmp = NULL;
 
 		// Generate path to target
 		CCLTRY(adtValue::copy(strLoc,strFull));
@@ -139,15 +152,22 @@ void AnProjectile :: onValue (	const WCHAR *pwRoot,
 		// Cast directly, depends on knowledge of how it is stored in "nLoc"
 		CCLTRYE( (pElemRef = ((nElementRef *)vL.punk)) != NULL, E_UNEXPECTED );
 
-		// Wait for a valid root and a valid main scene component
-		if (hr == S_OK && (pcUp = pElemRef->pElem->GetRootComponent()) != NULL && pcProj != NULL)
-			{
-			// Assign update target for projection rules
-			CCLOK ( pcProj->SetUpdatedComponent(pcUp); )
+		// Valid scene component ?
+		CCLTRYE( (pSc = pElemRef->pElem->GetRootComponent()) != NULL, E_UNEXPECTED );
 
-			// Snapshot latest transform
-//			CCLOK ( tPrev = pcUp->GetRelativeTransform(); )
-pcProj->Activate();
+		// Valid primitive component ?
+		CCLTRYE( pSc->IsA(UPrimitiveComponent::StaticClass()) == true, E_UNEXPECTED );
+
+		// Assign
+		CCLOK ( pcCmp = Cast<UPrimitiveComponent>(pSc); )
+
+		// Update properties
+		if (hr == S_OK)
+			{
+			pcCmp->bApplyImpulseOnDamage = false;
+			pcCmp->SetSimulatePhysics(bSimulate);
+			pcCmp->SetEnableGravity(bGravity);
+			pcCmp->SetMassScale(NAME_None,fMass);
 			}	// if
 
 		// Clean up
@@ -164,38 +184,20 @@ pcProj->Activate();
 		fAccum	= 0.0f;
 		}	// else if
 
-	// Velocity
-	else if (	((bX = (WCASECMP(pwLoc,L"Velocity/A1/OnFire/Value") == 0)) == true) ||
-					((bY = (WCASECMP(pwLoc,L"Velocity/A2/OnFire/Value") == 0)) == true) ||
-					((bZ = (WCASECMP(pwLoc,L"Velocity/A3/OnFire/Value") == 0)) == true) )
+	// Force values
+	else if (	(bX = !WCASECMP(pwLoc,L"Force/A1/OnFire/Value")) == true ||
+					(bY = !WCASECMP(pwLoc,L"Force/A2/OnFire/Value")) == true ||
+					(bZ = !WCASECMP(pwLoc,L"Force/A3/OnFire/Value")) == true )
 		{
-//		UE_LOG(LogTemp, Warning, TEXT("AnProjectile::Velocity"));
-
-		// Shape Type update
-		if			(bX)	fX = v;
-		else if	(bY)	fY = v;
-		else if	(bZ)	fZ = v;
-
-		// Update velocity
-//		lprintf ( LOG_INFO, L"Velocity : %g %g %g", (float)fX, (float)fY, (float)fZ );
-
-		// How much of this is necessary ?
-//		pcProj->v
-		pcProj->SetVelocityInLocalSpace(FVector(fX,fY,fZ));
-		pcProj->UpdateComponentVelocity();
-pcProj->bAutoUpdateTickRegistration = true;
-pcProj->Activate(true);
-
-		// The Unreal projectile component unlinks from the target component any
-		// time there is a hit event, re-assign each change of velocity so ensure
-		// it keeps working.
-		if (pcUp != NULL)
-			pcProj->SetUpdatedComponent(pcUp);
-		}	// if
+		// Assign
+		if			(bX)	vForce.X = adtFloat(v);
+		else if	(bY)	vForce.Y = adtFloat(v);
+		else				vForce.Z = adtFloat(v);
+		}	// else if
 
 	}	// onReceive
 
-void AnProjectile :: Tick( float DeltaTime )
+void AnPhysics :: Tick( float DeltaTime )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -210,6 +212,14 @@ void AnProjectile :: Tick( float DeltaTime )
 	// Base behaviour
 	Super::Tick( DeltaTime );
 
+	// It is possible for the target component to show up later...
+
+	// If a valid component exists and there is a non-zero force specified,
+	// add it in for the tick.  Check to see if physics is enabled first
+	// otherwise lots of error messages are output.
+	if (pcCmp != NULL && bSimulate)
+		pcCmp->AddForce(vForce);
+
 	// Time to update ?
 	fAccum += DeltaTime;
 	if (fUpdate > 0.0f && fAccum > fUpdate)
@@ -218,11 +228,11 @@ void AnProjectile :: Tick( float DeltaTime )
 //		UE_LOG(LogTemp, Warning, TEXT("Update!") );
 
 		// Valid update component ?
-		if (pcUp != NULL)
+		if (pcCmp != NULL)
 			{
 			// Current transform
 			FTransform
-			tNow = pcUp->GetRelativeTransform();
+			tNow = pcCmp->GetRelativeTransform();
 
 			// Compare each set of components
 
@@ -272,7 +282,7 @@ void AnProjectile :: Tick( float DeltaTime )
 
 	}	// Tick
 
-void AnProjectile :: updateValue ( const WCHAR *pwVal, float fV )
+void AnPhysics :: updateValue ( const WCHAR *pwVal, float fV )
 	{
 	////////////////////////////////////////////////////////////////////////
 	//

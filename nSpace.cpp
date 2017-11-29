@@ -99,7 +99,7 @@ HRESULT AnSpace :: addListen ( const WCHAR *pwLoc, nSpaceClientCB *pCB,
 		hr = strLoc.prepend ( pwLocRen );
 
 	// Add to queue and signal thread
-	dbgprintf ( L"AnSpace::addStore:%s\r\n", (LPCWSTR)strLoc );
+	dbgprintf ( L"AnSpace::addListen:%s\r\n", (LPCWSTR)strLoc );
 	CCLTRY ( pWrkQ->write ( adtInt(OP_LISTEN) ) );
 	CCLTRY ( pWrkQ->write ( strLoc ) );
 	CCLTRY ( pWrkQ->write ( adtLong((U64)pCB) ) );

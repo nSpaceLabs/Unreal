@@ -59,7 +59,7 @@ void AnElement::BeginPlay()
 	bRun = true;
 
 	// Request listen of location for this element
-	dbgprintf ( L"AnElement::workTick:Listen %s\r\n", (LPCWSTR)strLstn );
+	dbgprintf ( L"AnElement::workTick:Listen %s\r\n", (LPCWSTR)strLoc );
 	CCLTRY ( pLoc->addListen ( strLoc, this ) );
 	}	// BeginPlay
 
@@ -242,9 +242,10 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			}	// if
 
 	// Rotation
-	else if ((bA1 = !WCASECMP(pwLoc,L"Element/Transform/Rotate/A1/OnFire/Value")) == true ||
-				(bA2 = !WCASECMP(pwLoc,L"Element/Transform/Rotate/A2/OnFire/Value")) == true ||
-				(bA3 = !WCASECMP(pwLoc,L"Element/Transform/Rotate/A3/OnFire/Value")) == true )
+	else if ((bA1 =!WCASECMP(pwLoc,L"Element/Transform/Rotate/A1/OnFire/Value")) == true ||
+				(bA2 =!WCASECMP(pwLoc,L"Element/Transform/Rotate/A2/OnFire/Value")) == true ||
+				(bA3 =!WCASECMP(pwLoc,L"Element/Transform/Rotate/A3/OnFire/Value")) == true ||
+				(		!WCASECMP(pwLoc,L"Element/Transform/Rotate/A4/OnFire/Value")) == true)
 			{
 			adtDouble	dV(v);
 
@@ -260,10 +261,11 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			// Set component
 			if			(bA1)	fRotNow.X = dV;
 			else if	(bA2)	fRotNow.Y = dV;
-			else				fRotNow.Z = dV;	
+			else if	(bA3)	fRotNow.Z = dV;	
+			else				fRotNow.W = dV;	
 
 			// Set rotation
-			t.SetRotation(FQuat::MakeFromEuler(fRotNow));
+			t.SetRotation(fRotNow);
 
 			// New transform
 			if (pRoot != NULL)
@@ -350,9 +352,9 @@ void AnElement :: rootUpdate ( void )
 	if (pRoot != NULL)
 		{
 		FTransform	fX		= pRoot->GetRelativeTransform();
-		fX.SetTranslation ( fT );
-		fX.SetScale3D ( fS );
-		fX.SetRotation (FQuat::MakeFromEuler(fRotNow));
+		fX.SetTranslation	( fT );
+		fX.SetScale3D		( fS );
+		fX.SetRotation		( fRotNow );
 		pRoot->SetRelativeTransform ( fX );
 		}	// if
 
@@ -1064,3 +1066,4 @@ bool UAnElement :: onReceive (	AnElement *pElem,
 			break;
 		}	// switch
 */
+

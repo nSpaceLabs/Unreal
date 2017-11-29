@@ -59,14 +59,13 @@ class AnElement :
 	// Run-time data
 	AnLoc			*pLoc;									// Parent render location actor
 	adtString	strLoc;									// Location of element state
-	adtString	strLstn;									// Listen location
 	bool			bRun;										// Element running
 
 	// State
 	FVector		fT,fS,fR;								// Target transformations
 	FVector		fTt;										// Time for translation
 	FVector		fSclLcl;									// Local scaling (if needed)
-	FVector		fRotNow;									// Current rotation
+	FQuat			fRotNow;									// Current rotation
 	int			iColor;									// 32-bit color
 	bool			bVisible;								// Should be visible ?
 
