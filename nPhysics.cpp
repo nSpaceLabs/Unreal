@@ -217,7 +217,7 @@ void AnPhysics :: Tick( float DeltaTime )
 	// If a valid component exists and there is a non-zero force specified,
 	// add it in for the tick.  Check to see if physics is enabled first
 	// otherwise lots of error messages are output.
-	if (pcCmp != NULL && bSimulate)
+	if (pcCmp != NULL && bSimulate && !vForce.IsZero())
 		pcCmp->AddForce(vForce);
 
 	// Time to update ?
@@ -305,3 +305,4 @@ void AnPhysics :: updateValue ( const WCHAR *pwVal, float fV )
 	CCLTRY ( pLoc->addStore ( strLocUp, adtFloat(fV) ) );
 
 	}	// updateValue
+

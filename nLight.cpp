@@ -141,4 +141,3 @@ void AnLight :: onValue (	const WCHAR *pwRoot,
 		}	// if
 
 	}	// onValue
-

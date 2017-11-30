@@ -38,6 +38,7 @@ AnShape::AnShape()
 	if (FMat == NULL)
 		FMat = new ConstructorHelpers::FObjectFinder<UObject> 
 					( TEXT("/Engine/BasicShapes/BasicShapeMaterial") );
+//					( TEXT("/Engine/EditorMeshes/M_GreyBall") );
 
 	}	// AnShape
 
