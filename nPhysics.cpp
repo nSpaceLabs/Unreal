@@ -305,4 +305,3 @@ void AnPhysics :: updateValue ( const WCHAR *pwVal, float fV )
 	CCLTRY ( pLoc->addStore ( strLocUp, adtFloat(fV) ) );
 
 	}	// updateValue
-

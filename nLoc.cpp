@@ -10,6 +10,7 @@
 #include "nLabel.h"
 #include "nProjectile.h"
 #include "nPhysics.h"
+#include "nAudio.h"
 
 AnLoc :: AnLoc()
 	{
@@ -352,6 +353,9 @@ void AnLoc :: onValue (	const WCHAR *pwRoot,
 			else if (!WCASECMP(strDefV,L"Rule/Physics/")) 
 				pElem = Cast<AnPhysics>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
 												this,AnPhysics::StaticClass(),FTransform()));
+			else if (!WCASECMP(strDefV,L"Rule/Audio/")) 
+				pElem = Cast<AnAudio>(UGameplayStatics::BeginDeferredActorSpawnFromClass(
+												this,AnAudio::StaticClass(),FTransform()));
 
 			// Valid element ?
 			CCLTRYE ( (pElem != NULL), E_NOTIMPL );

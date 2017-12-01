@@ -140,7 +140,7 @@ HRESULT AnSpace :: addStore ( const WCHAR *pwLoc, const ADTVALUE &v,
 		hr = strLoc.prepend ( pwLocRen );
 
 	// Add to queue and signal thread
-	dbgprintf ( L"AnSpace::addStore:%s\r\n", (LPCWSTR)strLoc );
+//	dbgprintf ( L"AnSpace::addStore:%s\r\n", (LPCWSTR)strLoc );
 	CCLTRY ( pWrkQ->write ( adtInt(OP_STORE) ) );
 	CCLTRY ( pWrkQ->write ( strLoc ) );
 	CCLTRY ( pWrkQ->write ( v ) );
@@ -228,8 +228,8 @@ void AnSpace :: onValue (	const WCHAR *pwRoot,
 	//		-	vV contains the value
 	//
 	////////////////////////////////////////////////////////////////////////
-	HRESULT		hr				= S_OK;
-	bool			bCamera[4]	= { false, false, false, false };
+	HRESULT		hr		= S_OK;
+	bool			bT[4]	= { false, false, false, false };
 	adtInt		iIdx;
 //	int			idx;
 
@@ -364,20 +364,20 @@ void AnSpace :: onValue (	const WCHAR *pwRoot,
 		}	// else if
 
 	// Camera changes
-	else if (	((bCamera[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) == true) ||
-					((bCamera[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) == true) ||
-					((bCamera[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) == true) ||
-					((bCamera[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) == true) )
+	else if (	((bT[0] = (WCASECMP(pwLoc,L"Camera/Rotate/A1/OnFire/Value") == 0)) == true) ||
+					((bT[1] = (WCASECMP(pwLoc,L"Camera/Rotate/A2/OnFire/Value") == 0)) == true) ||
+					((bT[2] = (WCASECMP(pwLoc,L"Camera/Rotate/A3/OnFire/Value") == 0)) == true) ||
+					((bT[3] = (WCASECMP(pwLoc,L"Camera/Rotate/A4/OnFire/Value") == 0)) == true) )
 		{
 		// Cache new value
-		if			(bCamera[0])	fCamera[0] = adtFloat(vV);
-		else if	(bCamera[1])	fCamera[1] = adtFloat(vV);
-		else if	(bCamera[2])	fCamera[2] = adtFloat(vV);
-		else if	(bCamera[3])	fCamera[3] = adtFloat(vV);
+		if			(bT[0])	fCamera[0] = adtFloat(vV);
+		else if	(bT[1])	fCamera[1] = adtFloat(vV);
+		else if	(bT[2])	fCamera[2] = adtFloat(vV);
+		else if	(bT[3])	fCamera[3] = adtFloat(vV);
 
 		// Camera update ?  NOTE: Currently using the knowledge that all
 		// four coordinates are updated at the same time, change this...
-		if (bCamera[3])
+		if (bT[3])
 			{
 			static bool			bFirst = true;
 			static FRotator	rCtlr0;

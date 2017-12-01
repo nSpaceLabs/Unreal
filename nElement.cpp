@@ -206,6 +206,10 @@ void AnElement :: onValue (	const WCHAR *pwRoot,
 			else if	(bA2) fT.Y = dV;
 			else if  (bA3) fT.Z = dV;
 
+			// Zero velocity when changing position ?
+			if (pRoot != NULL && pRoot->IsA(UPrimitiveComponent::StaticClass()))
+				(Cast<UPrimitiveComponent>(pRoot))->SetPhysicsLinearVelocity(FVector(0,0,0));
+
 			// New transform with the new position
 			fX.SetTranslation ( fT );
 			if (pRoot != NULL)
